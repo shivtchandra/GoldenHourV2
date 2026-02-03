@@ -1,0 +1,184 @@
+Analyzing film cam...                                           
+
+warning • Unused import: 'colors.dart' • lib/app/theme/app_theme.dart:4:8 • unused_import
+   info • 'useTextTheme' is deprecated and shouldn't be used. This property has been replaced by the more aptly named useMaterial3Typography property and no longer has any function in V8 and will be removed in v9.0.0 • lib/app/theme/app_theme.dart:20:9 • deprecated_member_use
+   info • 'useTextTheme' is deprecated and shouldn't be used. This property has been replaced by the more aptly named useMaterial3Typography property and no longer has any function in V8 and will be removed in v9.0.0 • lib/app/theme/app_theme.dart:98:9 • deprecated_member_use
+   info • 'red' is deprecated and shouldn't be used. Use (*.r * 255.0).round() & 0xff • lib/core/services/image_processing_service.dart:374:38 • deprecated_member_use
+   info • 'green' is deprecated and shouldn't be used. Use (*.g * 255.0).round() & 0xff • lib/core/services/image_processing_service.dart:375:38 • deprecated_member_use
+   info • 'blue' is deprecated and shouldn't be used. Use (*.b * 255.0).round() & 0xff • lib/core/services/image_processing_service.dart:376:38 • deprecated_member_use
+   info • 'red' is deprecated and shouldn't be used. Use (*.r * 255.0).round() & 0xff • lib/core/services/image_processing_service.dart:378:41 • deprecated_member_use
+   info • 'green' is deprecated and shouldn't be used. Use (*.g * 255.0).round() & 0xff • lib/core/services/image_processing_service.dart:379:41 • deprecated_member_use
+   info • 'blue' is deprecated and shouldn't be used. Use (*.b * 255.0).round() & 0xff • lib/core/services/image_processing_service.dart:380:41 • deprecated_member_use
+   info • The import of 'dart:typed_data' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/foundation.dart' • lib/core/services/photo_storage_service.dart:2:8 • unnecessary_import
+   info • Uses 'await' on an instance of 'Image', which is not a subtype of 'Future' • lib/core/services/photo_storage_service.dart:72:30 • await_only_futures
+   info • 'value' is deprecated and shouldn't be used. Use component accessors like .r or .g, or toARGB32 for an explicit conversion • lib/features/camera/data/models/camera_model.dart:78:32 • deprecated_member_use
+   info • 'value' is deprecated and shouldn't be used. Use component accessors like .r or .g, or toARGB32 for an explicit conversion • lib/features/camera/data/models/pipeline_config.dart:363:36 • deprecated_member_use
+   info • 'value' is deprecated and shouldn't be used. Use component accessors like .r or .g, or toARGB32 for an explicit conversion • lib/features/camera/data/models/pipeline_config.dart:364:42 • deprecated_member_use
+   info • The import of 'dart:ui' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/material.dart' • lib/features/camera/presentation/screens/camera_screen.dart:1:8 • unnecessary_import
+warning • Unused import: '../../../../core/services/photo_storage_service.dart' • lib/features/camera/presentation/screens/camera_screen.dart:9:8 • unused_import
+warning • Unused import: '../../../settings/presentation/screens/settings_screen.dart' • lib/features/camera/presentation/screens/camera_screen.dart:20:8 • unused_import
+warning • Unused import: 'package:flutter_animate/flutter_animate.dart' • lib/features/camera/presentation/screens/camera_screen.dart:22:8 • unused_import
+warning • Unused import: 'package:shared_preferences/shared_preferences.dart' • lib/features/camera/presentation/screens/camera_screen.dart:23:8 • unused_import
+   info • The import of 'package:flutter/foundation.dart' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/services.dart' • lib/features/camera/presentation/screens/camera_screen.dart:28:8 • unnecessary_import
+warning • Unused import: 'package:gal/gal.dart' • lib/features/camera/presentation/screens/camera_screen.dart:29:8 • unused_import
+   info • The private field _isScrolling could be 'final' • lib/features/camera/presentation/screens/camera_screen.dart:54:8 • prefer_final_fields
+warning • The value of the field '_isScrolling' isn't used • lib/features/camera/presentation/screens/camera_screen.dart:54:8 • unused_field
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/screens/camera_screen.dart:305:65 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/screens/camera_screen.dart:390:49 • deprecated_member_use
+warning • The declaration '_openCameraSelector' isn't referenced • lib/features/camera/presentation/screens/camera_screen.dart:396:8 • unused_element
+   info • Statements in an if should be enclosed in a block • lib/features/camera/presentation/screens/camera_screen.dart:433:27 • curly_braces_in_flow_control_structures
+   info • Statements in an if should be enclosed in a block • lib/features/camera/presentation/screens/camera_screen.dart:434:32 • curly_braces_in_flow_control_structures
+   info • Statements in an if should be enclosed in a block • lib/features/camera/presentation/screens/camera_screen.dart:435:33 • curly_braces_in_flow_control_structures
+   info • Statements in an if should be enclosed in a block • lib/features/camera/presentation/screens/camera_screen.dart:436:10 • curly_braces_in_flow_control_structures
+warning • The declaration '_getColorMatrix' isn't referenced • lib/features/camera/presentation/screens/camera_screen.dart:514:16 • unused_element
+warning • The declaration '_processImageTask' isn't referenced • lib/features/camera/presentation/screens/camera_screen.dart:568:20 • unused_element
+   info • Statements in an if should be enclosed in a block • lib/features/camera/presentation/screens/camera_screen.dart:581:33 • curly_braces_in_flow_control_structures
+   info • Statements in an if should be enclosed in a block • lib/features/camera/presentation/screens/camera_screen.dart:582:39 • curly_braces_in_flow_control_structures
+   info • Statements in an if should be enclosed in a block • lib/features/camera/presentation/screens/camera_screen.dart:583:38 • curly_braces_in_flow_control_structures
+   info • Statements in an if should be enclosed in a block • lib/features/camera/presentation/screens/camera_screen.dart:584:38 • curly_braces_in_flow_control_structures
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/screens/camera_selector_screen.dart:98:43 • deprecated_member_use
+   info • Unnecessary use of multiple underscores • lib/features/camera/presentation/screens/camera_selector_screen.dart:222:31 • unnecessary_underscores
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/screens/camera_selector_screen.dart:236:43 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/screens/camera_selector_screen.dart:236:82 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/screens/camera_selector_screen.dart:237:35 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/screens/camera_selector_screen.dart:237:67 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/screens/camera_selector_screen.dart:241:65 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/screens/camera_selector_screen.dart:242:35 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/screens/camera_selector_screen.dart:242:66 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/screens/camera_selector_screen.dart:265:82 • deprecated_member_use
+warning • The value of the field '_isCollected' isn't used • lib/features/camera/presentation/screens/instant_development_screen.dart:31:8 • unused_field
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/screens/instant_development_screen.dart:111:42 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/screens/instant_development_screen.dart:224:40 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/screens/instant_development_screen.dart:244:76 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/screens/instant_development_screen.dart:251:41 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/screens/instant_development_screen.dart:274:45 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/screens/instant_development_screen.dart:312:33 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/screens/instant_development_screen.dart:419:43 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/screens/instant_development_screen.dart:438:35 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/screens/instant_development_screen.dart:457:33 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/screens/instant_development_screen.dart:462:33 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/screens/instant_development_screen.dart:478:48 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/screens/instant_development_screen.dart:509:33 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/screens/instant_development_screen.dart:514:33 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/screens/instant_development_screen.dart:539:31 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/screens/instant_development_screen.dart:540:37 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/screens/instant_development_screen.dart:544:54 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/screens/instant_development_screen.dart:555:42 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/screens/instant_development_screen.dart:597:33 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/screens/instant_development_screen.dart:603:33 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/screens/instant_development_screen.dart:639:43 • deprecated_member_use
+   info • The private field _isProcessing could be 'final' • lib/features/camera/presentation/screens/preview_screen.dart:24:8 • prefer_final_fields
+   info • The import of 'dart:ui' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/material.dart' • lib/features/camera/presentation/widgets/camera_card.dart:1:8 • unnecessary_import
+warning • Unused import: '../../data/models/pipeline_config.dart' • lib/features/camera/presentation/widgets/camera_card.dart:6:8 • unused_import
+   info • 'scale' is deprecated and shouldn't be used. Use scaleByVector3, scaleByVector4, or scaleByDouble instead • lib/features/camera/presentation/widgets/camera_card.dart:36:38 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/widgets/camera_card.dart:111:49 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/widgets/camera_card.dart:115:81 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/widgets/camera_card.dart:272:43 • deprecated_member_use
+warning • Unused import: 'package:google_fonts/google_fonts.dart' • lib/features/camera/presentation/widgets/film_effect_overlay.dart:4:8 • unused_import
+warning • Unused import: '../../../../app/theme/colors.dart' • lib/features/camera/presentation/widgets/film_effect_overlay.dart:5:8 • unused_import
+warning • Unused import: '../../../../app/theme/typography.dart' • lib/features/camera/presentation/widgets/film_effect_overlay.dart:6:8 • unused_import
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/widgets/film_effect_overlay.dart:159:54 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera/presentation/widgets/film_effect_overlay.dart:161:54 • deprecated_member_use
+warning • Unused import: 'dart:math' • lib/features/camera/presentation/widgets/shutter_button.dart:1:8 • unused_import
+warning • Unused import: 'package:animate_do/animate_do.dart' • lib/features/develop/presentation/screens/develop_screen.dart:6:8 • unused_import
+warning • Unused import: '../../../../app/theme/typography.dart' • lib/features/develop/presentation/screens/develop_screen.dart:14:8 • unused_import
+warning • The value of the field '_previewBytes' isn't used • lib/features/develop/presentation/screens/develop_screen.dart:47:14 • unused_field
+   info • Statements in an if should be enclosed in a block • lib/features/develop/presentation/screens/develop_screen.dart:133:33 • curly_braces_in_flow_control_structures
+   info • Statements in an if should be enclosed in a block • lib/features/develop/presentation/screens/develop_screen.dart:134:39 • curly_braces_in_flow_control_structures
+   info • Statements in an if should be enclosed in a block • lib/features/develop/presentation/screens/develop_screen.dart:135:38 • curly_braces_in_flow_control_structures
+   info • Statements in an if should be enclosed in a block • lib/features/develop/presentation/screens/develop_screen.dart:256:45 • curly_braces_in_flow_control_structures
+   info • Statements in an if should be enclosed in a block • lib/features/develop/presentation/screens/develop_screen.dart:257:50 • curly_braces_in_flow_control_structures
+   info • Statements in an if should be enclosed in a block • lib/features/develop/presentation/screens/develop_screen.dart:258:51 • curly_braces_in_flow_control_structures
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/develop/presentation/screens/develop_screen.dart:267:33 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/develop/presentation/screens/develop_screen.dart:285:37 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/develop/presentation/screens/develop_screen.dart:319:37 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/develop/presentation/screens/develop_screen.dart:339:47 • deprecated_member_use
+   info • Use a 'SizedBox' to add whitespace to a layout • lib/features/develop/presentation/screens/develop_screen.dart:387:11 • sized_box_for_whitespace
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/develop/presentation/screens/develop_screen.dart:397:35 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/develop/presentation/screens/develop_screen.dart:448:66 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/develop/presentation/screens/develop_screen.dart:448:98 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/develop/presentation/screens/develop_screen.dart:502:64 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/develop/presentation/screens/develop_screen.dart:502:96 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/develop/presentation/screens/develop_screen.dart:552:43 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/develop/presentation/screens/develop_screen.dart:554:62 • deprecated_member_use
+   info • 'activeColor' is deprecated and shouldn't be used. Use activeThumbColor instead. This feature was deprecated after v3.31.0-2.0.pre • lib/features/develop/presentation/screens/develop_screen.dart:609:15 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/develop/presentation/screens/develop_screen.dart:623:44 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/develop/presentation/screens/develop_screen.dart:659:48 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/develop/presentation/screens/develop_screen.dart:707:52 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/develop/presentation/screens/develop_screen.dart:707:84 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/develop/presentation/screens/develop_screen.dart:765:56 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/develop/presentation/screens/develop_screen.dart:765:88 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/gallery/presentation/screens/gallery_screen.dart:135:41 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/gallery/presentation/screens/gallery_screen.dart:141:43 • deprecated_member_use
+   info • Unnecessary use of multiple underscores • lib/features/gallery/presentation/screens/gallery_screen.dart:206:42 • unnecessary_underscores
+   info • Don't use 'BuildContext's across async gaps • lib/features/gallery/presentation/screens/gallery_screen.dart:311:31 • use_build_context_synchronously
+warning • Unused import: 'package:flex_color_scheme/flex_color_scheme.dart' • lib/features/home/presentation/screens/home_screen.dart:2:8 • unused_import
+warning • Unused import: '../../../camera/presentation/screens/camera_selector_screen.dart' • lib/features/home/presentation/screens/home_screen.dart:13:8 • unused_import
+warning • Unused import: 'studio_screen.dart' • lib/features/home/presentation/screens/home_screen.dart:14:8 • unused_import
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/home/presentation/screens/home_screen.dart:118:48 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/home/presentation/screens/home_screen.dart:130:49 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/home/presentation/screens/home_screen.dart:211:67 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/home/presentation/screens/home_screen.dart:248:43 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/home/presentation/screens/home_screen.dart:289:47 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/home/presentation/screens/home_screen.dart:304:48 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/home/presentation/screens/home_screen.dart:326:51 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/home/presentation/screens/home_screen.dart:332:58 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/home/presentation/screens/home_screen.dart:343:56 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/home/presentation/screens/home_screen.dart:345:87 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/home/presentation/screens/home_screen.dart:355:50 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/home/presentation/screens/home_screen.dart:366:43 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/home/presentation/screens/home_screen.dart:431:50 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/home/presentation/screens/home_screen.dart:475:50 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/home/presentation/screens/home_screen.dart:491:46 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/home/presentation/screens/home_screen.dart:513:71 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/home/presentation/screens/home_screen.dart:551:48 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/home/presentation/screens/home_screen.dart:565:45 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/home/presentation/screens/home_screen.dart:624:70 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/home/presentation/screens/home_screen.dart:667:49 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/home/presentation/screens/home_screen.dart:734:44 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/home/presentation/screens/home_screen.dart:739:83 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/home/presentation/screens/studio_screen.dart:25:43 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/home/presentation/screens/studio_screen.dart:44:55 • deprecated_member_use
+warning • The value of the field '_currentPage' isn't used • lib/features/onboarding/presentation/screens/onboarding_screen.dart:24:7 • unused_field
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/onboarding/presentation/screens/onboarding_screen.dart:47:42 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/onboarding/presentation/screens/onboarding_screen.dart:64:45 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/onboarding/presentation/screens/onboarding_screen.dart:104:51 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/onboarding/presentation/screens/onboarding_screen.dart:141:49 • deprecated_member_use
+   info • Unnecessary use of multiple underscores • lib/features/onboarding/presentation/screens/onboarding_screen.dart:239:39 • unnecessary_underscores
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/onboarding/presentation/screens/onboarding_screen.dart:286:71 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/onboarding/presentation/screens/onboarding_screen.dart:311:60 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/onboarding/presentation/screens/onboarding_screen.dart:398:71 • deprecated_member_use
+   info • Unnecessary use of multiple underscores • lib/features/onboarding/presentation/screens/onboarding_screen.dart:497:39 • unnecessary_underscores
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/onboarding/presentation/screens/onboarding_screen.dart:507:53 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/onboarding/presentation/screens/onboarding_screen.dart:516:57 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/onboarding/presentation/screens/onboarding_screen.dart:537:63 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/onboarding/presentation/screens/onboarding_screen.dart:630:48 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/onboarding/presentation/screens/onboarding_screen.dart:658:31 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/presets/presentation/screens/presets_screen.dart:77:45 • deprecated_member_use
+   info • Unnecessary use of multiple underscores • lib/features/presets/presentation/screens/presets_screen.dart:198:31 • unnecessary_underscores
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/presets/presentation/screens/presets_screen.dart:223:34 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/presets/presentation/screens/presets_screen.dart:223:64 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/presets/presentation/screens/presets_screen.dart:224:35 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/presets/presentation/screens/presets_screen.dart:224:67 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/presets/presentation/screens/presets_screen.dart:228:47 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/presets/presentation/screens/presets_screen.dart:229:35 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/presets/presentation/screens/presets_screen.dart:229:66 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/presets/presentation/screens/presets_screen.dart:257:41 • deprecated_member_use
+   info • The import of 'dart:ui' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/material.dart' • lib/features/presets/presentation/widgets/preset_card.dart:1:8 • unnecessary_import
+warning • Unused import: '../../../camera/data/models/pipeline_config.dart' • lib/features/presets/presentation/widgets/preset_card.dart:6:8 • unused_import
+   info • 'scale' is deprecated and shouldn't be used. Use scaleByVector3, scaleByVector4, or scaleByDouble instead • lib/features/presets/presentation/widgets/preset_card.dart:34:38 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/presets/presentation/widgets/preset_card.dart:102:49 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/presets/presentation/widgets/preset_card.dart:106:81 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/presets/presentation/widgets/preset_card.dart:258:43 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/settings/presentation/screens/profile_screen.dart:26:45 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/settings/presentation/screens/profile_screen.dart:81:55 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/settings/presentation/screens/profile_screen.dart:115:43 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/settings/presentation/screens/settings_screen.dart:36:43 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/settings/presentation/screens/settings_screen.dart:171:39 • deprecated_member_use
+   info • 'activeColor' is deprecated and shouldn't be used. Use activeThumbColor instead. This feature was deprecated after v3.31.0-2.0.pre • lib/features/settings/presentation/screens/settings_screen.dart:223:11 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/splash/presentation/screens/splash_screen.dart:58:42 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/splash/presentation/screens/splash_screen.dart:82:55 • deprecated_member_use
+warning • Unused import: 'features/camera/presentation/screens/camera_screen.dart' • lib/main.dart:5:8 • unused_import
+warning • Unused import: 'package:flutter/material.dart' • test/widget_test.dart:1:8 • unused_import
+
+180 issues found. (ran in 2.3s)
