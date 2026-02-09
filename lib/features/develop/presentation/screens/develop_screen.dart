@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -42,6 +43,8 @@ class DevelopScreen extends ConsumerStatefulWidget {
 }
 
 class _DevelopScreenState extends ConsumerState<DevelopScreen> {
+  final ImagePicker _picker = ImagePicker();
+
   // Image State
   File? _currentFile;
   img.Image? _originalImage;
@@ -105,19 +108,27 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
 
     try {
       final bytes = await _currentFile!.readAsBytes();
-      
-      // Do the heavy lifting (decode + resize) in ONE isolate call.
-      // This minimizes memory spikes by resizing immediately inside the isolate.
-      final decoded = await compute(_decodeAndResizeTask, bytes);
-      
+
+      // Primary decode path in isolate for performance.
+      // Fallback to platform codec when needed for device-specific formats.
+      img.Image? decoded = await compute(_decodeAndResizeTask, bytes);
+      if (decoded == null || _isLikelyInvalidDecode(decoded)) {
+        final platformDecoded = await _decodeAndResizeWithPlatform(bytes);
+        if (platformDecoded != null) {
+          decoded = platformDecoded;
+        }
+      }
+
       if (decoded != null) {
         _originalImage = decoded;
-        
+
         // We no longer pre-compute capturePreview because we'll use Image.file 
         // for the "Original" view, which is much more stable and handled natively.
         _capturePreviewBytes = null; 
 
         await _updatePreview();
+      } else {
+        debugPrint('DevelopScreen: Could not decode selected image bytes.');
       }
     } catch (e) {
       debugPrint('DevelopScreen: Error loading image: $e');
@@ -149,23 +160,115 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
     }
   }
 
+  Future<img.Image?> _decodeAndResizeWithPlatform(Uint8List bytes) async {
+    try {
+      final codec = await ui.instantiateImageCodec(bytes);
+      final frame = await codec.getNextFrame();
+      final uiImage = frame.image;
+
+      final rawBytes = await uiImage.toByteData(format: ui.ImageByteFormat.rawRgba);
+      final width = uiImage.width;
+      final height = uiImage.height;
+
+      uiImage.dispose();
+      codec.dispose();
+
+      if (rawBytes == null) return null;
+
+      img.Image decoded = img.Image.fromBytes(
+        width: width,
+        height: height,
+        bytes: rawBytes.buffer,
+        numChannels: 4,
+        order: img.ChannelOrder.rgba,
+      );
+
+      const int maxDimension = 1200;
+      if (decoded.width > maxDimension || decoded.height > maxDimension) {
+        if (decoded.width > decoded.height) {
+          decoded = img.copyResize(decoded, width: maxDimension, interpolation: img.Interpolation.average);
+        } else {
+          decoded = img.copyResize(decoded, height: maxDimension, interpolation: img.Interpolation.average);
+        }
+      }
+
+      return decoded;
+    } catch (e) {
+      debugPrint('DevelopScreen: Platform decode failed: $e');
+      return null;
+    }
+  }
+
+  static bool _isLikelyInvalidDecode(img.Image image) {
+    if (image.width < 8 || image.height < 8) return false;
+
+    const int sampleGrid = 24;
+    final int stepX = (image.width / sampleGrid).ceil().clamp(1, image.width);
+    final int stepY = (image.height / sampleGrid).ceil().clamp(1, image.height);
+
+    int minLum = 255;
+    int maxLum = 0;
+    int minR = 255;
+    int maxR = 0;
+    int minG = 255;
+    int maxG = 0;
+    int minB = 255;
+    int maxB = 0;
+
+    for (int y = 0; y < image.height; y += stepY) {
+      for (int x = 0; x < image.width; x += stepX) {
+        final pixel = image.getPixel(x, y);
+        final r = pixel.r.toInt();
+        final g = pixel.g.toInt();
+        final b = pixel.b.toInt();
+
+        final lum = (0.299 * r + 0.587 * g + 0.114 * b).round();
+        if (lum < minLum) minLum = lum;
+        if (lum > maxLum) maxLum = lum;
+
+        if (r < minR) minR = r;
+        if (r > maxR) maxR = r;
+        if (g < minG) minG = g;
+        if (g > maxG) maxG = g;
+        if (b < minB) minB = b;
+        if (b > maxB) maxB = b;
+      }
+    }
+
+    final bool lowLumaRange = (maxLum - minLum) <= 3;
+    final bool lowColorRange = (maxR - minR) <= 3 && (maxG - minG) <= 3 && (maxB - minB) <= 3;
+    return lowLumaRange && lowColorRange;
+  }
+
   Future<void> _updatePreview() async {
     if (_originalImage == null) return;
-    
-    // For live preview, we use a smaller version to keep it snappy
-    final processed = await compute(_processImageTask, {
-      'image': _originalImage!,
-      'pipeline': _pipeline,
-      'aspectRatio': _selectedAspectRatio,
-      'isPreview': true,
-      'date': _pipeline.showDateStamp ? (_pipeline.dateStampText ?? widget.date) : null,
-    });
-    
-    final encoded = await compute(img.encodeJpg, processed);
-    if (mounted) {
-      setState(() {
-        _displayBytes = Uint8List.fromList(encoded);
+
+    try {
+      // For live preview, we use a smaller version to keep it snappy.
+      final processed = await compute(_processImageTask, {
+        'image': _originalImage!,
+        'pipeline': _pipeline,
+        'aspectRatio': _selectedAspectRatio,
+        'isPreview': true,
+        'date': _pipeline.showDateStamp ? (_pipeline.dateStampText ?? widget.date) : null,
       });
+
+      final encoded = await compute(img.encodeJpg, processed);
+      if (mounted) {
+        setState(() {
+          _displayBytes = Uint8List.fromList(encoded);
+        });
+      }
+    } catch (e) {
+      debugPrint('DevelopScreen: Preview processing failed, using fallback: $e');
+      try {
+        final fallback = await compute(img.encodeJpg, _originalImage!);
+        if (mounted) {
+          setState(() {
+            _displayBytes = Uint8List.fromList(fallback);
+          });
+        }
+      } catch (_) {}
     }
   }
 
@@ -349,6 +452,25 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
   Widget _buildImagePreview({bool noDecoration = false, BoxFit fit = BoxFit.contain}) {
     final tc = context.colors;
 
+    Widget buildSafeFileImage() {
+      if (_currentFile == null) return _buildImageError(tc, 'NO IMAGE FILE');
+      return Image.file(
+        _currentFile!,
+        fit: fit,
+        errorBuilder: (context, error, stackTrace) {
+          if (_displayBytes != null) {
+            return Image.memory(
+              _displayBytes!,
+              fit: fit,
+              gaplessPlayback: true,
+              errorBuilder: (_, __, ___) => _buildImageError(tc, 'UNSUPPORTED PHOTO'),
+            );
+          }
+          return _buildImageError(tc, 'UNSUPPORTED PHOTO');
+        },
+      );
+    }
+
     // Determine the primary widget to show
     Widget imageWidget;
     
@@ -356,7 +478,7 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
       // ALWAYS use Image.file for original if available - it's handled natively
       // and won't crash even with 48MP images.
       if (_currentFile != null) {
-        imageWidget = Image.file(_currentFile!, fit: fit);
+        imageWidget = buildSafeFileImage();
       } else {
         imageWidget = _buildImageError(tc, 'ORIGINAL NOT FOUND');
       }
@@ -375,7 +497,7 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
       imageWidget = Stack(
         fit: StackFit.expand,
         children: [
-          Image.file(_currentFile!, fit: fit),
+          buildSafeFileImage(),
           if (_isProcessing) 
             Container(
               color: Colors.black26,
