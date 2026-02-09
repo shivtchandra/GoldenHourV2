@@ -12,11 +12,8 @@ class ImageProcessingService {
     required PipelineConfig pipeline,
     String? date,
   }) {
-    img.Image processed = img.copyResize(
-      inputImage,
-      width: inputImage.width,
-      height: inputImage.height,
-    );
+    // Create working copy without resampling to preserve quality
+    img.Image processed = img.Image.from(inputImage);
 
     // Processing pipeline order (important for realistic results):
 

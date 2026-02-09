@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'colors.dart';
 
 /// Golden Hour Typography System
 /// Primary: Warbler Deck (or Serif alternative like DM Serif Display)
@@ -77,7 +76,6 @@ class AppTypography {
         fontSize: 32,
         fontStyle: FontStyle.italic,
         fontWeight: FontWeight.bold,
-        color: AppColors.retroBurgundy,
         height: 1.2,
       );
 
@@ -85,20 +83,17 @@ class AppTypography {
         fontSize: 20,
         fontStyle: FontStyle.italic,
         fontWeight: FontWeight.w600,
-        color: AppColors.retroBurgundy,
       );
 
   // Technical info
   static TextStyle get monoMedium => GoogleFonts.spaceMono(
         fontSize: 12,
         fontWeight: FontWeight.w500,
-        color: AppColors.retroBurgundy,
       );
-      
+
   static TextStyle get monoSmall => GoogleFonts.spaceMono(
         fontSize: 10,
         fontWeight: FontWeight.w500,
-        color: AppColors.retroBurgundy,
       );
       
   // COMPATIBILITY

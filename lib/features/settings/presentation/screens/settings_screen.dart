@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:glass_kit/glass_kit.dart';
 import 'package:animate_do/animate_do.dart';
-import '../../../../app/theme/colors.dart';
 import '../../../../app/theme/typography.dart';
+import '../../../../app/theme/theme_colors.dart';
 import 'package:film_cam/features/camera/providers/settings_provider.dart';
 import 'package:film_cam/features/camera/data/repositories/camera_repository.dart';
 import 'package:film_cam/features/settings/providers/user_provider.dart';
@@ -20,6 +19,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
+    final tc = context.colors;
     final activeCamera = CameraRepository.getAllCameras().firstWhere(
       (c) => c.id == settings.activeCameraId,
       orElse: () => CameraRepository.getAllCameras().first,
@@ -34,7 +34,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             height: 250,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppColors.accentGold.withOpacity(0.05),
+              color: tc.accent.withOpacity(0.05),
             ),
           ),
         ),
@@ -47,12 +47,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 child: ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
                   children: [
+                    _buildRoyalSectionHeader('APPEARANCE'),
+                    _buildRoyalSettingsTile(
+                      icon: Icons.brightness_6_rounded,
+                      title: 'Theme Mode',
+                      subtitle: _getThemeDisplayName(settings.themeMode),
+                      onTap: () => _showThemeModePicker(),
+                    ),
+
+                    const SizedBox(height: 32),
                     _buildRoyalSectionHeader('CAMERA PREFERENCES'),
                     _buildRoyalSettingsTile(
                       icon: Icons.camera_alt_outlined,
                       title: 'Default Preset',
                       subtitle: activeCamera.name,
                       onTap: () => _showDefaultCameraPicker(),
+                    ),
+                    _buildRoyalSettingsTile(
+                      icon: Icons.route_rounded,
+                      title: 'Preferred Workflow',
+                      subtitle: _getWorkflowDisplayName(settings.preferredWorkflow),
+                      onTap: () => _showWorkflowPicker(),
                     ),
                     _buildRoyalSwitchTile(
                       icon: Icons.volume_up_outlined,
@@ -68,7 +83,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       value: settings.gridOverlay,
                       onChanged: (v) => ref.read(settingsProvider.notifier).setGridOverlay(v),
                     ),
-                    
+
                     const SizedBox(height: 32),
                     _buildRoyalSectionHeader('IMAGE PRODUCTION'),
                     _buildRoyalSettingsTile(
@@ -76,6 +91,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       title: 'Output Quality',
                       subtitle: settings.imageQuality,
                       onTap: () => _showQualityPicker(),
+                    ),
+                    _buildRoyalSwitchTile(
+                      icon: Icons.auto_fix_high_rounded,
+                      title: 'Instant Develop',
+                      subtitle: 'Skip manual development stage',
+                      value: settings.autoSave,
+                      onChanged: (v) => ref.read(settingsProvider.notifier).setAutoSave(v),
                     ),
                     _buildRoyalSwitchTile(
                       icon: Icons.history_edu_outlined,
@@ -94,7 +116,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                     _buildRoyalSettingsTile(
                       icon: Icons.info_outline_rounded,
-                      title: 'About FilmCam',
+                      title: 'About GoldenHour',
                       subtitle: 'Version 1.2.0 Royal Edition',
                       onTap: () => _showAboutDialog(),
                     ),
@@ -111,37 +133,38 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (widget.isEmbedded) return body;
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: tc.scaffoldBackground,
       body: body,
     );
   }
 
   void _showRestoreMembershipDialog() {
+    final tc = context.colors;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: Colors.grey[900],
-        title: const Text('Restore Membership', style: TextStyle(color: AppColors.accentGold)),
-        content: const Text('Checking with App Store / Play Store for previous purchases...', style: TextStyle(color: Colors.white70)),
+        backgroundColor: tc.dialogBackground,
+        title: Text('Restore Membership', style: TextStyle(color: tc.accent)),
+        content: Text('Checking with App Store / Play Store for previous purchases...', style: TextStyle(color: tc.textSecondary)),
         actions: [
           TextButton(
             onPressed: () {
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('No active membership found.'), backgroundColor: Colors.black87),
+                SnackBar(content: const Text('No active membership found.'), backgroundColor: tc.cardSurface),
               );
             },
-            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+            child: Text('Cancel', style: TextStyle(color: tc.textTertiary)),
           ),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
               ref.read(userProfileProvider.notifier).upgradeToPro();
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Membership restored! Welcome back.'), backgroundColor: AppColors.accentGold),
+                SnackBar(content: const Text('Membership restored! Welcome back.'), backgroundColor: tc.accent),
               );
             },
-            child: const Text('Check', style: TextStyle(color: AppColors.accentGold)),
+            child: Text('Check', style: TextStyle(color: tc.accent)),
           ),
         ],
       ),
@@ -149,11 +172,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   void _showAboutDialog() {
+    final tc = context.colors;
     showAboutDialog(
       context: context,
-      applicationName: 'FilmCam',
+      applicationName: 'GoldenHour',
       applicationVersion: '1.2.0 Royal Edition',
-      applicationIcon: const Icon(Icons.camera_roll_rounded, color: AppColors.accentGold, size: 48),
+      applicationIcon: Icon(Icons.camera_roll_rounded, color: tc.accent, size: 48),
       children: [
         const Text('\nA cinematic camera experience refined for the modern era. Capturing the soul of analog film.', style: TextStyle(fontSize: 12)),
         const Text('\nBuilt with passion for photography.', style: TextStyle(fontSize: 10, fontStyle: FontStyle.italic)),
@@ -163,19 +187,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
 
   Widget _buildRoyalHeader() {
+    final tc = context.colors;
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: FadeInDown(
         child: Row(
           children: [
             if (!widget.isEmbedded)
-              _glassIconButton(
-                icon: Icons.arrow_back_ios_new_rounded,
-                onPressed: () => Navigator.pop(context),
+              AdaptiveGlass(
+                width: 48,
+                height: 48,
+                borderRadius: BorderRadius.circular(24),
+                borderColor: Colors.transparent,
+                child: IconButton(
+                  icon: Icon(Icons.arrow_back_ios_new_rounded, color: tc.iconPrimary, size: 20),
+                  onPressed: () => Navigator.pop(context),
+                ),
               )
             else
               const SizedBox(width: 48),
-            const Expanded(
+            Expanded(
               child: Center(
                 child: Text(
                   'PREFERENCES',
@@ -183,7 +214,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     fontFamily: 'Cinzel',
                     fontSize: 18,
                     letterSpacing: 4,
-                    color: AppColors.accentGold,
+                    color: tc.accent,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -196,26 +227,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Widget _glassIconButton({required IconData icon, required VoidCallback onPressed}) {
-    return GlassContainer.clearGlass(
-      width: 48,
-      height: 48,
-      borderRadius: BorderRadius.circular(24),
-      borderColor: Colors.transparent, // Fix for assertion
-      child: IconButton(
-        icon: Icon(icon, color: Colors.white, size: 20),
-        onPressed: onPressed,
-      ),
-    );
-  }
-
   Widget _buildRoyalSectionHeader(String title) {
+    final tc = context.colors;
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 16),
       child: Text(
         title,
         style: AppTypography.labelLarge.copyWith(
-          color: AppColors.accentGold.withOpacity(0.5),
+          color: tc.accentMuted,
           letterSpacing: 2,
           fontSize: 12,
         ),
@@ -229,18 +248,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     String? subtitle,
     required VoidCallback onTap,
   }) {
+    final tc = context.colors;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      child: GlassContainer.clearGlass(
+      child: AdaptiveGlass(
         height: 72,
-        width: double.infinity,
         borderRadius: BorderRadius.circular(16),
-        borderColor: Colors.transparent, // Fix for assertion
+        borderColor: Colors.transparent,
         child: ListTile(
-          leading: Icon(icon, color: Colors.white70),
-          title: Text(title, style: AppTypography.bodyLarge.copyWith(color: Colors.white, letterSpacing: 1)),
-          subtitle: subtitle != null ? Text(subtitle, style: AppTypography.monoSmall.copyWith(color: Colors.white38)) : null,
-          trailing: const Icon(Icons.chevron_right_rounded, color: Colors.white24),
+          leading: Icon(icon, color: tc.iconSecondary),
+          title: Text(title, style: AppTypography.bodyLarge.copyWith(color: tc.textPrimary, letterSpacing: 1)),
+          subtitle: subtitle != null ? Text(subtitle, style: AppTypography.monoSmall.copyWith(color: tc.textMuted)) : null,
+          trailing: Icon(Icons.chevron_right_rounded, color: tc.textFaint),
           onTap: onTap,
         ),
       ),
@@ -254,21 +273,128 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     required bool value,
     required ValueChanged<bool> onChanged,
   }) {
+    final tc = context.colors;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      child: GlassContainer.clearGlass(
+      child: AdaptiveGlass(
         height: 72,
-        width: double.infinity,
         borderRadius: BorderRadius.circular(16),
-        borderColor: Colors.transparent, // Fix for assertion
+        borderColor: Colors.transparent,
         child: SwitchListTile(
-          secondary: Icon(icon, color: Colors.white70),
-          title: Text(title, style: AppTypography.bodyLarge.copyWith(color: Colors.white, letterSpacing: 1)),
-          subtitle: Text(subtitle, style: AppTypography.monoSmall.copyWith(color: Colors.white38)),
+          secondary: Icon(icon, color: tc.iconSecondary),
+          title: Text(title, style: AppTypography.bodyLarge.copyWith(color: tc.textPrimary, letterSpacing: 1)),
+          subtitle: Text(subtitle, style: AppTypography.monoSmall.copyWith(color: tc.textMuted)),
           value: value,
           onChanged: onChanged,
-          activeColor: AppColors.accentGold,
+          activeColor: tc.accent,
         ),
+      ),
+    );
+  }
+
+  Widget _buildBottomSheetContainer({required double height, required Widget child}) {
+    final tc = context.colors;
+    return Container(
+      height: height,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+        gradient: LinearGradient(colors: [tc.sheetGradientStart, tc.sheetGradientEnd]),
+        border: Border.all(color: tc.borderSubtle),
+      ),
+      child: SafeArea(
+        bottom: true,
+        child: child,
+      ),
+    );
+  }
+
+  Widget _buildSheetHandle() {
+    final tc = context.colors;
+    return Column(
+      children: [
+        const SizedBox(height: 12),
+        Container(width: 40, height: 4, decoration: BoxDecoration(color: tc.textFaint, borderRadius: BorderRadius.circular(2))),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  String _getThemeDisplayName(String mode) {
+    switch (mode) {
+      case 'light':
+        return 'Light';
+      case 'system':
+        return 'System';
+      default:
+        return 'Dark';
+    }
+  }
+
+  void _showThemeModePicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Consumer(
+        builder: (context, ref, child) {
+          final settings = ref.watch(settingsProvider);
+          final sheetColors = context.colors;
+          final modes = [
+            {'id': 'dark', 'name': 'Dark', 'icon': Icons.dark_mode_rounded},
+            {'id': 'light', 'name': 'Light', 'icon': Icons.light_mode_rounded},
+            {'id': 'system', 'name': 'System', 'icon': Icons.settings_brightness_rounded},
+          ];
+          return Container(
+            height: 320,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+              gradient: LinearGradient(colors: [sheetColors.sheetGradientStart, sheetColors.sheetGradientEnd]),
+              border: Border.all(color: sheetColors.borderSubtle),
+            ),
+            child: SafeArea(
+              bottom: true,
+              child: Column(
+                children: [
+                  const SizedBox(height: 12),
+                  Container(width: 40, height: 4, decoration: BoxDecoration(color: sheetColors.textFaint, borderRadius: BorderRadius.circular(2))),
+                  const SizedBox(height: 24),
+                  Text('THEME MODE', style: AppTypography.labelLarge.copyWith(color: sheetColors.accent, letterSpacing: 4)),
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: ListView(
+                      padding: EdgeInsets.zero,
+                      children: modes.map((mode) => ListTile(
+                        leading: Icon(
+                          mode['icon'] as IconData,
+                          color: settings.themeMode == mode['id']
+                            ? sheetColors.accent
+                            : sheetColors.textTertiary,
+                        ),
+                        title: Text(
+                          mode['name'] as String,
+                          style: TextStyle(
+                            color: settings.themeMode == mode['id']
+                              ? sheetColors.accent
+                              : sheetColors.textPrimary,
+                          ),
+                        ),
+                        trailing: settings.themeMode == mode['id']
+                          ? Icon(Icons.check_circle_rounded, color: sheetColors.accent)
+                          : null,
+                        onTap: () {
+                          ref.read(settingsProvider.notifier).setThemeMode(mode['id'] as String);
+                          Navigator.pop(context);
+                        },
+                      )).toList(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -281,29 +407,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       builder: (context) => Consumer(
         builder: (context, ref, child) {
           final settings = ref.watch(settingsProvider);
+          final sheetColors = context.colors;
           return Padding(
             padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-            child: GlassContainer(
+            child: Container(
               height: 420,
               width: double.infinity,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-              gradient: LinearGradient(colors: [Colors.black, Colors.grey.shade900]),
-              borderColor: Colors.white10,
+              decoration: BoxDecoration(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+                gradient: LinearGradient(colors: [sheetColors.sheetGradientStart, sheetColors.sheetGradientEnd]),
+                border: Border.all(color: sheetColors.borderSubtle),
+              ),
               child: SafeArea(
                 bottom: true,
                 child: Column(
                   children: [
                     const SizedBox(height: 12),
-                    Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
+                    Container(width: 40, height: 4, decoration: BoxDecoration(color: sheetColors.textFaint, borderRadius: BorderRadius.circular(2))),
                     const SizedBox(height: 24),
-                    Text('CHOOSE PRESET', style: AppTypography.labelLarge.copyWith(color: AppColors.accentGold, letterSpacing: 4)),
+                    Text('CHOOSE PRESET', style: AppTypography.labelLarge.copyWith(color: sheetColors.accent, letterSpacing: 4)),
                     const SizedBox(height: 16),
                     Expanded(
                       child: ListView(
                         padding: EdgeInsets.zero,
                         children: CameraRepository.getFreeCameras().map((camera) => ListTile(
-                          title: Text(camera.name, style: const TextStyle(color: Colors.white)),
-                          trailing: settings.activeCameraId == camera.id ? const Icon(Icons.check_circle_rounded, color: AppColors.accentGold) : null,
+                          title: Text(camera.name, style: TextStyle(color: sheetColors.textPrimary)),
+                          trailing: settings.activeCameraId == camera.id ? Icon(Icons.check_circle_rounded, color: sheetColors.accent) : null,
                           onTap: () {
                             ref.read(settingsProvider.notifier).setActiveCamera(camera.id);
                             Navigator.pop(context);
@@ -329,31 +458,154 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       builder: (context) => Consumer(
         builder: (context, ref, child) {
           final settings = ref.watch(settingsProvider);
+          final sheetColors = context.colors;
           return Padding(
             padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-            child: GlassContainer(
+            child: Container(
               height: 420,
               width: double.infinity,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-              gradient: LinearGradient(colors: [Colors.black, Colors.grey.shade900]),
-              borderColor: Colors.white10,
+              decoration: BoxDecoration(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+                gradient: LinearGradient(colors: [sheetColors.sheetGradientStart, sheetColors.sheetGradientEnd]),
+                border: Border.all(color: sheetColors.borderSubtle),
+              ),
               child: SafeArea(
                 bottom: true,
                 child: Column(
                   children: [
                     const SizedBox(height: 12),
-                    Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
+                    Container(width: 40, height: 4, decoration: BoxDecoration(color: sheetColors.textFaint, borderRadius: BorderRadius.circular(2))),
                     const SizedBox(height: 24),
-                    Text('OUTPUT QUALITY', style: AppTypography.labelLarge.copyWith(color: AppColors.accentGold, letterSpacing: 4)),
+                    Text('OUTPUT QUALITY', style: AppTypography.labelLarge.copyWith(color: sheetColors.accent, letterSpacing: 4)),
                     const SizedBox(height: 16),
                     Expanded(
                       child: ListView(
                         padding: EdgeInsets.zero,
                         children: ['Low', 'Medium', 'High', 'Maximum'].map((q) => ListTile(
-                          title: Text(q, style: const TextStyle(color: Colors.white)),
-                          trailing: settings.imageQuality == q ? const Icon(Icons.check_circle_rounded, color: AppColors.accentGold) : null,
+                          title: Text(q, style: TextStyle(color: sheetColors.textPrimary)),
+                          trailing: settings.imageQuality == q ? Icon(Icons.check_circle_rounded, color: sheetColors.accent) : null,
                           onTap: () {
                             ref.read(settingsProvider.notifier).setImageQuality(q);
+                            Navigator.pop(context);
+                          },
+                        )).toList(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  String _getWorkflowDisplayName(String workflow) {
+    switch (workflow) {
+      case 'camera_explorer':
+        return 'Camera Explorer';
+      case 'quick_presets':
+        return 'Quick Presets';
+      case 'balanced':
+        return 'Balanced Studio';
+      default:
+        return 'Balanced Studio';
+    }
+  }
+
+  void _showWorkflowPicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Consumer(
+        builder: (context, ref, child) {
+          final settings = ref.watch(settingsProvider);
+          final sheetColors = context.colors;
+          final workflows = [
+            {
+              'id': 'camera_explorer',
+              'name': 'Camera Explorer',
+              'subtitle': 'Lens-first workflow',
+              'icon': Icons.auto_awesome_motion_rounded,
+            },
+            {
+              'id': 'quick_presets',
+              'name': 'Quick Presets',
+              'subtitle': 'Preset-first workflow',
+              'icon': Icons.auto_awesome_rounded,
+            },
+            {
+              'id': 'balanced',
+              'name': 'Balanced Studio',
+              'subtitle': 'Home-centered workflow',
+              'icon': Icons.home_rounded,
+            },
+          ];
+
+          return Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+            child: Container(
+              height: 420,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+                gradient: LinearGradient(colors: [sheetColors.sheetGradientStart, sheetColors.sheetGradientEnd]),
+                border: Border.all(color: sheetColors.borderSubtle),
+              ),
+              child: SafeArea(
+                bottom: true,
+                child: Column(
+                  children: [
+                    const SizedBox(height: 12),
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: sheetColors.textFaint,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'WORKFLOW PREFERENCE',
+                      style: AppTypography.labelLarge.copyWith(
+                        color: sheetColors.accent,
+                        letterSpacing: 4,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child: ListView(
+                        padding: EdgeInsets.zero,
+                        children: workflows.map((workflow) => ListTile(
+                          leading: Icon(
+                            workflow['icon'] as IconData,
+                            color: settings.preferredWorkflow == workflow['id']
+                              ? sheetColors.accent
+                              : sheetColors.textTertiary,
+                          ),
+                          title: Text(
+                            workflow['name'] as String,
+                            style: TextStyle(
+                              color: settings.preferredWorkflow == workflow['id']
+                                ? sheetColors.accent
+                                : sheetColors.textPrimary,
+                            ),
+                          ),
+                          subtitle: Text(
+                            workflow['subtitle'] as String,
+                            style: TextStyle(
+                              color: sheetColors.textMuted,
+                              fontSize: 12,
+                            ),
+                          ),
+                          trailing: settings.preferredWorkflow == workflow['id']
+                            ? Icon(Icons.check_circle_rounded, color: sheetColors.accent)
+                            : null,
+                          onTap: () {
+                            ref.read(settingsProvider.notifier).setPreferredWorkflow(workflow['id'] as String);
                             Navigator.pop(context);
                           },
                         )).toList(),

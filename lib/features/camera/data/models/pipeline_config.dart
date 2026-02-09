@@ -114,6 +114,11 @@ class PipelineConfig {
     );
   }
 
+  /// Create a neutral config for preset mode (no filter applied)
+  factory PipelineConfig.neutral() {
+    return PipelineConfig.defaultConfig();
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'temperature': temperature,
@@ -207,55 +212,145 @@ class PipelineConfig {
   }
 
   /// Generates a 4x5 color matrix for use with ColorFiltered
+  /// This EXACTLY matches ImageProcessingService output
   List<double> toColorMatrix() {
-    double contrast = 1.0 + contrastBias;
-    double sat = saturation;
-    double exp = 1.0 + (exposureBias * 0.1);
-    
-    // Contrast adjustment
-    double t = (1.0 - contrast) / 2.0;
-
-    // Temperature (simple approximation)
-    double rMod = 1.0;
-    double gMod = 1.0;
-    double bMod = 1.0;
-    
-    if (temperature > 0) {
-      rMod += temperature / 150;
-      gMod += temperature / 300;
-      bMod -= temperature / 300;
-    } else {
-      rMod += temperature / 300;
-      bMod -= temperature / 150;
-    }
-
-    // Saturation matrix (standard coefficients)
+    // Luminance coefficients (standard)
     const double lumR = 0.2126;
     const double lumG = 0.7152;
     const double lumB = 0.0722;
 
+    // ============================================
+    // MATCH ImageProcessingService EXACTLY
+    // ============================================
+
+    // Exposure multiplier (matches _adjustExposureAndContrast)
+    double exposureMult = exposureBias >= 0
+        ? 1.0 + exposureBias * 0.5
+        : 1.0 + exposureBias * 0.3;
+
+    // Contrast factor (matches _adjustExposureAndContrast)
+    double contrastFactor = (259 * (contrastBias * 255 + 255)) /
+        (255 * (259 - contrastBias * 255));
+
+    // Saturation
+    double sat = saturation;
+
+    // Color offsets for temperature/tint (additive, matches pixel processing)
+    double rOffset = 0.0;
+    double gOffset = 0.0;
+    double bOffset = 0.0;
+
+    // Temperature adjustment (EXACT match to ImageProcessingService)
+    if (temperature > 0) {
+      // Warm: increase red, decrease blue
+      rOffset += temperature * 2.5;
+      bOffset -= temperature * 1.5;
+    } else if (temperature < 0) {
+      // Cool: increase blue, decrease red
+      bOffset += temperature.abs() * 2.5;
+      rOffset -= temperature.abs() * 1.5;
+    }
+
+    // Tint adjustment (EXACT match to ImageProcessingService)
+    if (tint > 0) {
+      // Magenta: increase red and blue, decrease green
+      rOffset += tint * 1.2;
+      bOffset += tint * 1.2;
+      gOffset -= tint * 0.8;
+    } else if (tint < 0) {
+      // Green: increase green, decrease red and blue
+      gOffset += tint.abs() * 2.0;
+      rOffset -= tint.abs() * 0.5;
+      bOffset -= tint.abs() * 0.5;
+    }
+
+    // Shadows offset (lifted blacks)
+    rOffset += shadows * 30;
+    gOffset += shadows * 30;
+    bOffset += shadows * 30;
+
+    // ============================================
+    // SPECIAL MODES
+    // ============================================
+
+    if (expiredMode) {
+      double fog = (fogLevel ?? 0.1) * 255 * 0.5;
+      rOffset += fog;
+      gOffset += fog;
+      bOffset += fog;
+      exposureMult *= 0.85;
+    }
+
+    if (crossProcessed) {
+      rOffset += 10;
+      gOffset -= 5;
+      bOffset += 15;
+    }
+
+    if (infraredMode) {
+      rOffset += 30;
+      gOffset -= 20;
+      bOffset -= 30;
+    }
+
+    if (redscaleMode == true) {
+      rOffset += 50;
+      gOffset -= 20;
+      bOffset -= 40;
+    }
+
+    if (slideFilm) {
+      sat *= 1.3;
+      contrastFactor *= 1.1;
+    }
+
+    if (motionPicture == true) {
+      sat *= 0.85;
+      rOffset += 8;
+      gOffset += 4;
+    }
+
+    if (splitToning != null) {
+      rOffset += (splitToning!.shadowColor.red - 128) * 0.15;
+      gOffset += (splitToning!.shadowColor.green - 128) * 0.15;
+      bOffset += (splitToning!.shadowColor.blue - 128) * 0.15;
+    }
+
+    // ============================================
+    // BUILD MATRIX
+    // ============================================
+
+    // Saturation matrix components
     double sr = (1 - sat) * lumR;
     double sg = (1 - sat) * lumG;
     double sb = (1 - sat) * lumB;
 
-    // Combine adjustments
-    double finalR = contrast * rMod * exp;
-    double finalG = contrast * gMod * exp;
-    double finalB = contrast * bMod * exp;
+    // Combined scale factors
+    double scale = exposureMult * contrastFactor;
 
+    // Contrast offset (centers the contrast adjustment)
+    double contrastOffset = 128 * (1 - contrastFactor);
+
+    // Final offsets
+    double finalROffset = rOffset + contrastOffset;
+    double finalGOffset = gOffset + contrastOffset;
+    double finalBOffset = bOffset + contrastOffset;
+
+    // Black & White mode
     if (blackWhiteMode) {
       return [
-        lumR, lumG, lumB, 0, 0,
-        lumR, lumG, lumB, 0, 0,
-        lumR, lumG, lumB, 0, 0,
+        lumR * scale, lumG * scale, lumB * scale, 0, finalROffset,
+        lumR * scale, lumG * scale, lumB * scale, 0, finalGOffset,
+        lumR * scale, lumG * scale, lumB * scale, 0, finalBOffset,
         0, 0, 0, 1, 0,
       ];
     }
 
+    // Color matrix with saturation
     return [
-      finalR * (sr + sat), finalR * sg, finalR * sb, 0, t * 255,
-      finalG * sr, finalG * (sg + sat), finalG * sb, 0, t * 255,
-      finalB * sr, finalB * sg, finalB * (sb + sat), 0, t * 255,
+      scale * (sr + sat), scale * sg, scale * sb, 0, finalROffset,
+      scale * sr, scale * (sg + sat), scale * sb, 0, finalGOffset,
+      scale * sr, scale * sg, scale * (sb + sat), 0, finalBOffset,
       0, 0, 0, 1, 0,
     ];
   }

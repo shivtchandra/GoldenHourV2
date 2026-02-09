@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:glass_kit/glass_kit.dart';
 import 'package:animate_do/animate_do.dart';
 import '../../../../app/theme/colors.dart';
+import '../../../../app/theme/theme_colors.dart';
 import '../../../../app/theme/typography.dart';
 import '../../data/models/preset_model.dart';
 import '../../data/repositories/preset_repository.dart';
@@ -61,8 +62,9 @@ class _PresetsScreenState extends State<PresetsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final tc = context.colors;
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: tc.scaffoldBackground,
       body: Stack(
         children: [
           // Background Glow
@@ -74,7 +76,7 @@ class _PresetsScreenState extends State<PresetsScreen> {
               height: 300,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.accentGold.withOpacity(0.05),
+                color: tc.accentSubtle,
               ),
             ),
           ),
@@ -102,6 +104,7 @@ class _PresetsScreenState extends State<PresetsScreen> {
   }
 
   Widget _buildRoyalHeader() {
+    final tc = context.colors;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: FadeInDown(
@@ -120,7 +123,7 @@ class _PresetsScreenState extends State<PresetsScreen> {
               style: AppTypography.displayMedium.copyWith(
                 fontSize: 18,
                 letterSpacing: 4,
-                color: AppColors.accentGold,
+                color: tc.accent,
               ),
             ),
             _glassIconButton(
@@ -134,13 +137,13 @@ class _PresetsScreenState extends State<PresetsScreen> {
   }
 
   Widget _glassIconButton({required IconData icon, required VoidCallback onPressed}) {
-    return GlassContainer.clearGlass(
+    return AdaptiveGlass(
       width: 48,
       height: 48,
       borderRadius: BorderRadius.circular(24),
       borderColor: Colors.transparent,
       child: IconButton(
-        icon: Icon(icon, color: Colors.white, size: 20),
+        icon: Icon(icon, color: context.colors.iconPrimary, size: 20),
         onPressed: onPressed,
       ),
     );
@@ -148,9 +151,10 @@ class _PresetsScreenState extends State<PresetsScreen> {
 
 
   Widget _buildRoyalSearchBar() {
+    final tc = context.colors;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      child: GlassContainer.clearGlass(
+      child: AdaptiveGlass(
         height: 56,
         width: double.infinity,
         borderRadius: BorderRadius.circular(28),
@@ -160,11 +164,11 @@ class _PresetsScreenState extends State<PresetsScreen> {
             _searchQuery = v;
             _filterPresets();
           },
-          style: AppTypography.bodyLarge.copyWith(color: Colors.white),
+          style: AppTypography.bodyLarge.copyWith(color: tc.textPrimary),
           decoration: InputDecoration(
             hintText: 'Search presets...',
-            hintStyle: AppTypography.bodyLarge.copyWith(color: Colors.white38),
-            prefixIcon: const Icon(Icons.search_rounded, color: AppColors.accentGold),
+            hintStyle: AppTypography.bodyLarge.copyWith(color: tc.textMuted),
+            prefixIcon: Icon(Icons.search_rounded, color: tc.accent),
             border: InputBorder.none,
             contentPadding: const EdgeInsets.symmetric(vertical: 18),
           ),
@@ -177,6 +181,7 @@ class _PresetsScreenState extends State<PresetsScreen> {
   // _likedMarker moved up
 
   Widget _buildRoyalFilterChips() {
+    final tc = context.colors;
     final categories = [
       {'label': 'ALL', 'value': null},
       {'label': 'LIKED', 'value': _likedMarker},
@@ -202,8 +207,8 @@ class _PresetsScreenState extends State<PresetsScreen> {
 
           final accentColor = (category['value'] is PresetCategory)
               ? (category['value'] as PresetCategory).accentColor
-              : AppColors.accentGold;
-          
+              : tc.accent;
+
           return GestureDetector(
             onTap: () {
               setState(() {
@@ -214,25 +219,25 @@ class _PresetsScreenState extends State<PresetsScreen> {
 
             child: GlassContainer(
               height: 42,
-              width: index == 0 ? 80 : 100, // Dynamic width for chips
+              width: index == 0 ? 80 : 100,
               padding: const EdgeInsets.symmetric(horizontal: 20),
               borderRadius: BorderRadius.circular(25),
               borderColor: Colors.transparent,
               gradient: LinearGradient(
-                colors: isSelected 
+                colors: isSelected
                   ? [accentColor.withOpacity(0.3), accentColor.withOpacity(0.1)]
-                  : [Colors.white.withOpacity(0.05), Colors.white.withOpacity(0.01)],
+                  : [tc.glassBackground, tc.glassBackground.withOpacity(0.01)],
               ),
               borderGradient: LinearGradient(
-                colors: isSelected 
+                colors: isSelected
                   ? [accentColor, accentColor.withOpacity(0.2)]
-                  : [Colors.white.withOpacity(0.1), Colors.white.withOpacity(0.05)],
+                  : [tc.glassBorder, tc.glassBorder.withOpacity(0.5)],
               ),
               child: Center(
                 child: Text(
                   category['label'] as String,
                   style: AppTypography.labelMedium.copyWith(
-                    color: isSelected ? accentColor : Colors.white60,
+                    color: isSelected ? accentColor : tc.iconMuted,
                     letterSpacing: 2,
                     fontSize: 10,
                   ),
@@ -247,6 +252,7 @@ class _PresetsScreenState extends State<PresetsScreen> {
 
 
   Widget _buildEmptyState() {
+    final tc = context.colors;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -254,13 +260,13 @@ class _PresetsScreenState extends State<PresetsScreen> {
           Icon(
             Icons.palette_outlined,
             size: 64,
-            color: AppColors.accentGold.withOpacity(0.1),
+            color: tc.accentSubtle,
           ),
           const SizedBox(height: 16),
           Text(
             'NO PRESETS FOUND',
             style: AppTypography.displaySmall.copyWith(
-              color: Colors.white24,
+              color: tc.textFaint,
               letterSpacing: 2,
             ),
           ),
@@ -304,14 +310,16 @@ class _PresetsScreenState extends State<PresetsScreen> {
                 );
               }
             },
-            onFavorite: () {
-              setState(() {
-                PresetRepository.toggleFavorite(preset.id);
-                // Refresh list if we are in 'LIKED' mode
-                if (_selectedCategory == _likedMarker) {
-                  _filteredPresets = PresetRepository.getFavoritePresets();
-                }
-              });
+            onFavorite: () async {
+              await PresetRepository.toggleFavorite(preset.id);
+              if (mounted) {
+                setState(() {
+                  // Refresh list if we are in 'LIKED' mode
+                  if (_selectedCategory == _likedMarker) {
+                    _filteredPresets = PresetRepository.getFavoritePresets();
+                  }
+                });
+              }
             },
 
           ),

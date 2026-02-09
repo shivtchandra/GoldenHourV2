@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
 import '../models/camera_model.dart';
 import '../models/pipeline_config.dart';
 
@@ -6,18 +8,45 @@ import '../models/pipeline_config.dart';
 class CameraRepository {
   CameraRepository._();
 
-  /// Get all cameras
-  // Favorites Management
-  static final Set<String> _favorites = {}; // Start with no favorites
+  static SharedPreferences? _prefs;
+  static final Set<String> _favorites = {};
+  static final _favoriteController = StreamController<void>.broadcast();
+
+  /// Initialize with SharedPreferences
+  static Future<void> init(SharedPreferences prefs) async {
+    _prefs = prefs;
+    
+    // Load existing favorites
+    final favStrings = _prefs?.getStringList('favorite_cameras');
+    if (favStrings != null && favStrings.isNotEmpty) {
+      _favorites.addAll(favStrings);
+    } else {
+      // Bootstrap from toolkitCameraIds if favorites are empty (restores onboarding defaults)
+      final toolkitStrings = _prefs?.getStringList('toolkitCameraIds');
+      if (toolkitStrings != null) {
+        _favorites.addAll(toolkitStrings);
+        // Save them to the new key immediately
+        await _prefs?.setStringList('favorite_cameras', _favorites.toList());
+      }
+    }
+  }
+
+  /// Stream of favorite changes
+  static Stream<void> get favoritesChanged => _favoriteController.stream;
 
   static bool isFavorite(String id) => _favorites.contains(id);
 
-  static void toggleFavorite(String id) {
+  static Future<void> toggleFavorite(String id) async {
     if (_favorites.contains(id)) {
       _favorites.remove(id);
     } else {
       _favorites.add(id);
     }
+    
+    if (_prefs != null) {
+      await _prefs!.setStringList('favorite_cameras', _favorites.toList());
+    }
+    _favoriteController.add(null);
   }
 
   static List<CameraModel> getFavoriteCameras() {

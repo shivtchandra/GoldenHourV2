@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// App color palette for FilmCam - Retro-Modern Film Photography Studio
+/// App color palette for GoldenHour - Retro-Modern Film Photography Studio
 class AppColors {
   AppColors._();
 

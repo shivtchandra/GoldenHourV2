@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:typed_data';
 import '../../../../app/theme/colors.dart';
+import '../../../../app/theme/theme_colors.dart';
 import '../../../../app/theme/typography.dart';
 import '../../data/models/camera_model.dart';
 
@@ -26,6 +27,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Preview screen stays dark - part of camera/capture workflow
+    final tc = context.colors;
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -50,7 +53,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
               child: Text(
                 'Save',
                 style: AppTypography.labelLarge.copyWith(
-                  color: AppColors.retroBurgundy,
+                  color: tc.accent,
                 ),
               ),
             ),
@@ -62,7 +65,6 @@ class _PreviewScreenState extends State<PreviewScreen> {
           Expanded(
             child: Stack(
               children: [
-                // Image or placeholder
                 Container(
                   width: double.infinity,
                   height: double.infinity,
@@ -92,14 +94,12 @@ class _PreviewScreenState extends State<PreviewScreen> {
                           ),
                         ),
                 ),
-
-                // Processing indicator
                 if (_isProcessing)
                   Container(
                     color: Colors.black54,
-                    child: const Center(
+                    child: Center(
                       child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation(AppColors.retroBurgundy),
+                        valueColor: AlwaysStoppedAnimation(tc.accent),
                       ),
                     ),
                   ),
@@ -110,10 +110,10 @@ class _PreviewScreenState extends State<PreviewScreen> {
           // Effect intensity slider
           Container(
             padding: const EdgeInsets.all(20),
-            decoration: const BoxDecoration(
-              color: AppColors.cardBackground,
+            decoration: BoxDecoration(
+              color: tc.cardSurface,
               border: Border(
-                top: BorderSide(color: AppColors.divider),
+                top: BorderSide(color: tc.borderSubtle),
               ),
             ),
             child: Column(
@@ -130,7 +130,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
                     Text(
                       '${(_effectIntensity * 100).round()}%',
                       style: AppTypography.monoMedium.copyWith(
-                        color: AppColors.retroBurgundy,
+                        color: tc.accent,
                       ),
                     ),
                   ],
@@ -138,10 +138,10 @@ class _PreviewScreenState extends State<PreviewScreen> {
                 const SizedBox(height: 12),
                 SliderTheme(
                   data: SliderThemeData(
-                    activeTrackColor: AppColors.retroBurgundy,
-                    inactiveTrackColor: AppColors.divider,
-                    thumbColor: AppColors.retroBurgundy,
-                    overlayColor: AppColors.retroBurgundy.withAlpha(51),
+                    activeTrackColor: tc.accent,
+                    inactiveTrackColor: tc.borderSubtle,
+                    thumbColor: tc.accent,
+                    overlayColor: tc.accent.withAlpha(51),
                   ),
                   child: Slider(
                     value: _effectIntensity,
@@ -151,7 +151,6 @@ class _PreviewScreenState extends State<PreviewScreen> {
                       setState(() {
                         _effectIntensity = value;
                       });
-                      // In production, reprocess image with new intensity
                     },
                   ),
                 ),
@@ -173,9 +172,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
                 _buildActionButton(
                   icon: Icons.tune,
                   label: 'Adjust',
-                  onTap: () {
-                    // Open adjustment panel
-                  },
+                  onTap: () {},
                 ),
                 _buildActionButton(
                   icon: Icons.share,
@@ -195,6 +192,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
     required String label,
     required VoidCallback onTap,
   }) {
+    final tc = context.colors;
     return GestureDetector(
       onTap: onTap,
       child: Column(
@@ -204,9 +202,9 @@ class _PreviewScreenState extends State<PreviewScreen> {
             width: 56,
             height: 56,
             decoration: BoxDecoration(
-              color: AppColors.cardBackground,
+              color: tc.cardSurface,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.divider),
+              border: Border.all(color: tc.borderSubtle),
             ),
             child: Icon(
               icon,
@@ -240,7 +238,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
             'Photo saved to gallery',
             style: AppTypography.bodyMedium.copyWith(color: Colors.white),
           ),
-          backgroundColor: AppColors.retroTeal,
+          backgroundColor: context.colors.success,
         ),
       );
       Navigator.pop(context);
@@ -254,7 +252,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
           'Share functionality coming soon',
           style: AppTypography.bodyMedium.copyWith(color: Colors.white),
         ),
-        backgroundColor: AppColors.cardBackground,
+        backgroundColor: context.colors.cardSurface,
       ),
     );
   }

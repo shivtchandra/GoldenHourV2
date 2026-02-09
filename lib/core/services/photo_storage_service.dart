@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
@@ -14,13 +15,16 @@ class PhotoStorageService {
   static final PhotoStorageService _instance = PhotoStorageService._();
   static PhotoStorageService get instance => _instance;
 
+  final _photosChangedController = StreamController<void>.broadcast();
+  Stream<void> get photosChanged => _photosChangedController.stream;
+
   final Uuid _uuid = const Uuid();
   final ImageProcessingService _processingService = ImageProcessingService();
 
   /// Get the photos directory
   Future<Directory> get _photosDir async {
     final appDir = await getApplicationDocumentsDirectory();
-    final photosDir = Directory('${appDir.path}/filmcam_photos');
+    final photosDir = Directory('${appDir.path}/goldenhour_photos');
     
     if (!await photosDir.exists()) {
       await photosDir.create(recursive: true);
@@ -61,11 +65,7 @@ class PhotoStorageService {
       
       debugPrint('PhotoStorage: Image decoded ${inputImage.width}x${inputImage.height}');
       
-      // Resize for faster processing (optional - keeps quality reasonable)
-      if (inputImage.width > 1920) {
-        inputImage = img.copyResize(inputImage, width: 1920);
-        debugPrint('PhotoStorage: Resized to ${inputImage.width}x${inputImage.height}');
-      }
+      // No longer resizing - keep full resolution for maximum quality
       
       // Apply film effect using the processing service
       debugPrint('PhotoStorage: Applying effects...');
@@ -86,6 +86,8 @@ class PhotoStorageService {
       await destFile.writeAsBytes(processedBytes);
       
       debugPrint('PhotoStorage: Saved processed photo to $destinationPath');
+      
+      _photosChangedController.add(null);
       
       return destinationPath;
     } catch (e, stack) {
@@ -112,6 +114,7 @@ class PhotoStorageService {
       await destFile.writeAsBytes(bytes);
       
       debugPrint('PhotoStorage: Saved pre-processed photo to $destinationPath');
+      _photosChangedController.add(null);
       return destinationPath;
     } catch (e) {
       debugPrint('PhotoStorage: Error saving processed photo: $e');
@@ -160,9 +163,11 @@ class PhotoStorageService {
             }
             cameraId = parts[1];
           }
-        } else if (filename.startsWith('filmcam_')) {
-          // Legacy format
-          final parts = filename.replaceAll('filmcam_', '').split('_');
+        } else if (filename.startsWith('filmcam_') || filename.startsWith('goldenhour_')) {
+          // Legacy/Alternate format
+          final parts = filename.contains('filmcam_') 
+              ? filename.replaceAll('filmcam_', '').split('_')
+              : filename.replaceAll('goldenhour_', '').split('_');
           if (parts.length >= 3) {
             for (int i = 0; i < parts.length; i++) {
               final maybeTimestamp = int.tryParse(parts[i]);
@@ -198,6 +203,7 @@ class PhotoStorageService {
       if (await file.exists()) {
         await file.delete();
         debugPrint('PhotoStorage: Deleted $path');
+        _photosChangedController.add(null);
         return true;
       }
       return false;

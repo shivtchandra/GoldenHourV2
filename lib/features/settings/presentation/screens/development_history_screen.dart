@@ -1,8 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:glass_kit/glass_kit.dart';
 import 'package:animate_do/animate_do.dart';
-import '../../../../app/theme/colors.dart';
+import '../../../../app/theme/theme_colors.dart';
 import '../../../../app/theme/typography.dart';
 import '../../../../core/services/photo_storage_service.dart';
 import '../../../camera/data/repositories/camera_repository.dart';
@@ -36,21 +35,22 @@ class _DevelopmentHistoryScreenState extends State<DevelopmentHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final tc = context.colors;
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: tc.scaffoldBackground,
       body: Stack(
         children: [
-          _buildBackgroundGlow(),
+          _buildBackgroundGlow(context),
           SafeArea(
             child: Column(
               children: [
                 _buildHeader(context),
                 Expanded(
-                  child: _isLoading 
-                      ? const Center(child: CircularProgressIndicator(color: AppColors.accentGold))
-                      : _photos.isEmpty 
-                          ? _buildEmptyState()
-                          : _buildHistoryList(),
+                  child: _isLoading
+                      ? Center(child: CircularProgressIndicator(color: tc.accent))
+                      : _photos.isEmpty
+                          ? _buildEmptyState(context)
+                          : _buildHistoryList(context),
                 ),
               ],
             ),
@@ -60,7 +60,7 @@ class _DevelopmentHistoryScreenState extends State<DevelopmentHistoryScreen> {
     );
   }
 
-  Widget _buildBackgroundGlow() {
+  Widget _buildBackgroundGlow(BuildContext context) {
     return Positioned(
       top: -100,
       right: -100,
@@ -69,28 +69,29 @@ class _DevelopmentHistoryScreenState extends State<DevelopmentHistoryScreen> {
         height: 300,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: AppColors.accentGold.withOpacity(0.05),
+          color: context.colors.accentSubtle,
         ),
       ),
     );
   }
 
   Widget _buildHeader(BuildContext context) {
+    final tc = context.colors;
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Row(
         children: [
-          GlassContainer.clearGlass(
+          AdaptiveGlass(
             width: 48,
             height: 48,
             borderRadius: BorderRadius.circular(24),
             borderColor: Colors.transparent,
             child: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+              icon: Icon(Icons.arrow_back_ios_new_rounded, color: tc.iconPrimary, size: 20),
               onPressed: () => Navigator.pop(context),
             ),
           ),
-          const Expanded(
+          Expanded(
             child: Center(
               child: Text(
                 'DEVELOPMENT LOG',
@@ -98,7 +99,7 @@ class _DevelopmentHistoryScreenState extends State<DevelopmentHistoryScreen> {
                   fontFamily: 'Cinzel',
                   fontSize: 18,
                   letterSpacing: 4,
-                  color: AppColors.accentGold,
+                  color: tc.accent,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -110,40 +111,42 @@ class _DevelopmentHistoryScreenState extends State<DevelopmentHistoryScreen> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(BuildContext context) {
+    final tc = context.colors;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.history_rounded, size: 64, color: Colors.white10),
+          Icon(Icons.history_rounded, size: 64, color: tc.textGhost),
           const SizedBox(height: 16),
           Text(
             'NO HISTORY RECORDED',
-            style: AppTypography.displaySmall.copyWith(color: Colors.white24, letterSpacing: 2),
+            style: AppTypography.displaySmall.copyWith(color: tc.textFaint, letterSpacing: 2),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildHistoryList() {
+  Widget _buildHistoryList(BuildContext context) {
+    final tc = context.colors;
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
       itemCount: _photos.length,
       itemBuilder: (context, index) {
         final photo = _photos[index];
         final camera = CameraRepository.getCameraById(photo.cameraId);
-        
+
         return FadeInUp(
           duration: const Duration(milliseconds: 300),
           delay: Duration(milliseconds: index * 50),
           child: Container(
             margin: const EdgeInsets.only(bottom: 16),
-            child: GlassContainer.clearGlass(
+            child: AdaptiveGlass(
               height: 100,
               width: double.infinity,
               borderRadius: BorderRadius.circular(20),
-              borderColor: Colors.white10,
+              borderColor: tc.borderSubtle,
               child: Row(
                 children: [
                   // Photo Thumbnail
@@ -156,7 +159,7 @@ class _DevelopmentHistoryScreenState extends State<DevelopmentHistoryScreen> {
                       child: Image.file(File(photo.path), fit: BoxFit.cover),
                     ),
                   ),
-                  
+
                   // Metadata
                   Expanded(
                     child: Padding(
@@ -166,19 +169,19 @@ class _DevelopmentHistoryScreenState extends State<DevelopmentHistoryScreen> {
                         children: [
                           Text(
                             camera?.name.toUpperCase() ?? 'UNKNOWN FILM',
-                            style: AppTypography.labelLarge.copyWith(color: AppColors.accentGold, fontSize: 13, letterSpacing: 1),
+                            style: AppTypography.labelLarge.copyWith(color: tc.accent, fontSize: 13, letterSpacing: 1),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             photo.formattedTime.toUpperCase(),
-                            style: AppTypography.monoSmall.copyWith(color: Colors.white54, fontSize: 10),
+                            style: AppTypography.monoSmall.copyWith(color: tc.textTertiary, fontSize: 10),
                           ),
                           const Spacer(),
                           Row(
                             children: [
-                              Icon(Icons.check_circle_outline_rounded, color: Colors.greenAccent.withOpacity(0.6), size: 14),
+                              Icon(Icons.check_circle_outline_rounded, color: tc.success.withOpacity(0.6), size: 14),
                               const SizedBox(width: 4),
-                              Text('DEVELOPED', style: AppTypography.labelMedium.copyWith(color: Colors.white38, fontSize: 9, letterSpacing: 1)),
+                              Text('DEVELOPED', style: AppTypography.labelMedium.copyWith(color: tc.textMuted, fontSize: 9, letterSpacing: 1)),
                             ],
                           ),
                         ],

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 /// Global key type for camera preview state access
 typedef CameraPreviewState = _CameraPreviewWidgetState;
@@ -36,32 +37,66 @@ class _CameraPreviewWidgetState extends State<CameraPreviewWidget>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _controller?.dispose();
+    final CameraController? cameraController = _controller;
+    _controller = null;
+    cameraController?.dispose();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_controller == null || !_controller!.value.isInitialized) {
+    final CameraController? cameraController = _controller;
+
+    // App state changed before we got the chance to initialize.
+    if (cameraController == null || !cameraController.value.isInitialized) {
       return;
     }
 
     if (state == AppLifecycleState.inactive) {
-      _controller?.dispose();
+      cameraController.dispose();
     } else if (state == AppLifecycleState.resumed) {
-      _initializeCamera();
+      if (mounted) {
+        _initializeCamera();
+      }
     }
   }
 
   Future<void> _initializeCamera() async {
     try {
+      // 1. Request Camera Permission explicitly
+      final status = await Permission.camera.status;
+      if (!status.isGranted) {
+        final result = await Permission.camera.request();
+        if (!result.isGranted) {
+          if (mounted) {
+            setState(() {
+              _hasError = true;
+              _errorMessage = result.isPermanentlyDenied 
+                  ? 'Camera permission permanently denied.\nPlease enable it in app settings.' 
+                  : 'Camera access required.\nPlease grant permission.';
+            });
+          }
+          return;
+        }
+      }
+
+      // 2. Clear previous errors if we have permission now
+      if (mounted) {
+        setState(() {
+          _hasError = false;
+          _errorMessage = '';
+        });
+      }
+
       _cameras = await availableCameras();
       
       if (_cameras.isEmpty) {
-        setState(() {
-          _hasError = true;
-          _errorMessage = 'No cameras available';
-        });
+        if (mounted) {
+          setState(() {
+            _hasError = true;
+            _errorMessage = 'No cameras available';
+          });
+        }
         return;
       }
 
@@ -72,9 +107,11 @@ class _CameraPreviewWidgetState extends State<CameraPreviewWidget>
 
       final selectedCamera = cameraIndex >= 0 ? _cameras[cameraIndex] : _cameras.first;
 
+      // Use medium resolution to prevent memory issues on real devices
+      // High/veryHigh can capture 12-48MP which causes out-of-memory during processing
       _controller = CameraController(
         selectedCamera,
-        ResolutionPreset.high,
+        ResolutionPreset.medium, // ~720p - much safer for processing
         enableAudio: false,
         imageFormatGroup: ImageFormatGroup.jpeg,
       );
@@ -92,7 +129,7 @@ class _CameraPreviewWidgetState extends State<CameraPreviewWidget>
       if (mounted) {
         setState(() {
           _hasError = true;
-          _errorMessage = 'Camera access required.\nPlease grant permission.';
+          _errorMessage = 'Camera initialization failed.\n$e';
         });
       }
     }
@@ -160,14 +197,31 @@ class _CameraPreviewWidgetState extends State<CameraPreviewWidget>
                 ),
               ),
               const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: _initializeCamera,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Retry'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white24,
-                  foregroundColor: Colors.white,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: _initializeCamera,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('RETRY'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white12,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton.icon(
+                    onPressed: () => openAppSettings(),
+                    icon: const Icon(Icons.settings),
+                    label: const Text('SETTINGS'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white12,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

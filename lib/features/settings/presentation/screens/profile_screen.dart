@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:glass_kit/glass_kit.dart';
 import 'package:animate_do/animate_do.dart';
-import '../../../../app/theme/colors.dart';
+import '../../../../app/theme/theme_colors.dart';
 import '../../../../app/theme/typography.dart';
 import 'package:film_cam/features/settings/providers/user_provider.dart';
 import 'package:film_cam/features/settings/presentation/screens/settings_screen.dart';
 import 'package:film_cam/features/settings/presentation/screens/development_history_screen.dart';
+import 'package:film_cam/features/auth/providers/auth_provider.dart';
+import '../../../../features/onboarding/presentation/screens/onboarding_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -14,10 +15,11 @@ class ProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(userProfileProvider);
-    final statsAsync = ref.watch(userStatsProvider);
+    final statsAsync = ref.watch(dynamicUserStatsProvider);
+    final tc = context.colors;
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: tc.scaffoldBackground,
       body: Stack(
         children: [
           // Elegant Glow
@@ -29,23 +31,23 @@ class ProfileScreen extends ConsumerWidget {
               height: 400,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.accentGold.withOpacity(0.03),
+                color: tc.accentSubtle,
               ),
             ),
           ),
-          
+
           SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Column(
                 children: [
                   const SizedBox(height: 40),
-                  _buildProfileHeader(user),
+                  _buildProfileHeader(context, user),
                   const SizedBox(height: 48),
                   statsAsync.when(
-                    data: (stats) => _buildStatsRow(stats),
-                    loading: () => const Center(child: CircularProgressIndicator(color: AppColors.accentGold)),
-                    error: (_, __) => _buildStatsRow(UserStats(captures: 0, rolls: 0, likes: 0)),
+                    data: (stats) => _buildStatsRow(context, stats),
+                    loading: () => Center(child: CircularProgressIndicator(color: tc.accent)),
+                    error: (_, __) => _buildStatsRow(context, UserStats(captures: 0, rolls: 0, likes: 0)),
                   ),
                   const SizedBox(height: 48),
                   _buildMenuSection(context, ref, user),
@@ -54,19 +56,19 @@ class ProfileScreen extends ConsumerWidget {
               ),
             ),
           ),
-          
+
           // Back Button
           Positioned(
             top: 16,
             left: 16,
             child: SafeArea(
-              child: GlassContainer.clearGlass(
+              child: AdaptiveGlass(
                 width: 48,
                 height: 48,
                 borderRadius: BorderRadius.circular(24),
                 borderColor: Colors.transparent,
                 child: IconButton(
-                  icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+                  icon: Icon(Icons.arrow_back_ios_new_rounded, color: tc.iconPrimary, size: 20),
                   onPressed: () => Navigator.pop(context),
                 ),
               ),
@@ -77,7 +79,8 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildProfileHeader(UserProfile user) {
+  Widget _buildProfileHeader(BuildContext context, UserProfile user) {
+    final tc = context.colors;
     return Column(
       children: [
         FadeInDown(
@@ -86,18 +89,18 @@ class ProfileScreen extends ConsumerWidget {
             height: 120,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: AppColors.accentGold, width: 2),
+              border: Border.all(color: tc.accent, width: 2),
               boxShadow: [
-                BoxShadow(color: AppColors.accentGold.withOpacity(0.2), blurRadius: 20, spreadRadius: 2),
+                BoxShadow(color: tc.accent.withOpacity(0.2), blurRadius: 20, spreadRadius: 2),
               ],
             ),
             child: Center(
               child: Text(
-                user.name.isNotEmpty ? user.name[0] : '?',
-                style: const TextStyle(
+                user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
+                style: TextStyle(
                   fontFamily: 'Cinzel',
                   fontSize: 48,
-                  color: AppColors.accentGold,
+                  color: tc.accent,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -112,7 +115,7 @@ class ProfileScreen extends ConsumerWidget {
             style: AppTypography.displayMedium.copyWith(
               fontSize: 24,
               letterSpacing: 4,
-              color: Colors.white,
+              color: tc.textPrimary,
             ),
           ),
         ),
@@ -122,7 +125,7 @@ class ProfileScreen extends ConsumerWidget {
           child: Text(
             '${user.membershipStatus} • EST ${user.joinedDate.year}',
             style: AppTypography.monoSmall.copyWith(
-              color: AppColors.accentGold.withOpacity(0.6),
+              color: tc.accentSecondary,
               letterSpacing: 2,
             ),
           ),
@@ -131,67 +134,79 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildStatsRow(UserStats stats) {
+  Widget _buildStatsRow(BuildContext context, UserStats stats) {
     return FadeInUp(
       delay: const Duration(milliseconds: 600),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _statItem(stats.captures.toString(), 'CAPTURES'),
-          _statDivider(),
-          _statItem(stats.rolls.toString(), 'ROLLS'),
-          _statDivider(),
-          _statItem(stats.likes.toString(), 'LIKES'),
+          _statItem(context, stats.captures.toString(), 'CAPTURES'),
+          _statDivider(context),
+          _statItem(context, stats.rolls.toString(), 'ROLLS'),
+          _statDivider(context),
+          _statItem(context, stats.likes.toString(), 'LIKES'),
         ],
       ),
     );
   }
 
-  Widget _statItem(String value, String label) {
+  Widget _statItem(BuildContext context, String value, String label) {
+    final tc = context.colors;
     return Column(
       children: [
-        Text(value, style: AppTypography.displaySmall.copyWith(color: AppColors.accentGold, fontSize: 20)),
+        Text(value, style: AppTypography.displaySmall.copyWith(color: tc.accent, fontSize: 20)),
         const SizedBox(height: 4),
-        Text(label, style: AppTypography.labelMedium.copyWith(color: Colors.white38, fontSize: 10, letterSpacing: 1)),
+        Text(label, style: AppTypography.labelMedium.copyWith(color: tc.textMuted, fontSize: 10, letterSpacing: 1)),
       ],
     );
   }
 
-  Widget _statDivider() {
-    return Container(width: 1, height: 30, color: Colors.white10);
+  Widget _statDivider(BuildContext context) {
+    return Container(width: 1, height: 30, color: context.colors.borderSubtle);
   }
 
   Widget _buildMenuSection(BuildContext context, WidgetRef ref, UserProfile user) {
+    final tc = context.colors;
     return Column(
       children: [
         _menuTile(
+          context: context,
           icon: Icons.settings_outlined,
           title: 'PREFERENCES',
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
         ),
         _menuTile(
+          context: context,
           icon: Icons.history_rounded,
           title: 'DEVELOPMENT HISTORY',
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DevelopmentHistoryScreen())),
         ),
         if (!user.isPro)
           _menuTile(
+            context: context,
             icon: Icons.workspace_premium_outlined,
             title: 'UPGRADE TO PRO',
             onTap: () {
               ref.read(userProfileProvider.notifier).upgradeToPro();
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Welcome to the Royal Club!'), backgroundColor: AppColors.accentGold),
+                SnackBar(content: const Text('Welcome to the Royal Club!'), backgroundColor: tc.proBadgeBackground),
               );
             },
             isGold: true,
           ),
         _menuTile(
+          context: context,
           icon: Icons.logout_rounded,
           title: 'SIGN OUT',
-          onTap: () {
-            ref.read(userProfileProvider.notifier).signOut();
-            Navigator.popUntil(context, (route) => route.isFirst);
+          onTap: () async {
+            await ref.read(authProvider.notifier).logout();
+            if (context.mounted) {
+              // Navigate to onboarding so user can redo setup or skip to login
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const OnboardingScreen(showSkipToLogin: true)),
+                (route) => false,
+              );
+            }
           },
         ),
       ],
@@ -199,29 +214,31 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   Widget _menuTile({
+    required BuildContext context,
     required IconData icon,
     required String title,
     required VoidCallback onTap,
     bool isGold = false,
   }) {
+    final tc = context.colors;
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
-      child: GlassContainer.clearGlass(
+      child: AdaptiveGlass(
         height: 64,
         width: double.infinity,
         borderRadius: BorderRadius.circular(16),
         borderColor: Colors.transparent,
         child: ListTile(
-          leading: Icon(icon, color: isGold ? AppColors.accentGold : Colors.white70),
+          leading: Icon(icon, color: isGold ? tc.proBadgeBackground : tc.iconSecondary),
           title: Text(
             title,
             style: AppTypography.labelLarge.copyWith(
-              color: isGold ? AppColors.accentGold : Colors.white,
+              color: isGold ? tc.proBadgeBackground : tc.textPrimary,
               letterSpacing: 2,
               fontSize: 13,
             ),
           ),
-          trailing: const Icon(Icons.chevron_right_rounded, color: Colors.white24),
+          trailing: Icon(Icons.chevron_right_rounded, color: tc.textFaint),
           onTap: onTap,
         ),
       ),

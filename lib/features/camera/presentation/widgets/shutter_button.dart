@@ -110,129 +110,94 @@ class _ShutterButtonState extends State<ShutterButton>
   }
 
   Widget _buildButtonContent() {
-    final pulseValue = _pulseAnimation?.value ?? 0.75;
-    
     return GestureDetector(
       onTapDown: _handleTapDown,
       onTapUp: _handleTapUp,
       onTapCancel: _handleTapCancel,
       child: SizedBox(
-        width: 90,
-        height: 90,
+        width: 100,
+        height: 100,
         child: Stack(
           alignment: Alignment.center,
           children: [
-            // Outer glow
+            // Outer Ring (Subtle Glow/Reflection)
             Container(
-              width: 88,
-              height: 88,
+              width: 90,
+              height: 90,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.redAccent.withAlpha((100 * pulseValue).toInt()),
-                    blurRadius: 25,
-                    spreadRadius: 3,
-                  ),
-                ],
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.2),
+                  width: 1.5,
+                ),
               ),
             ),
 
-            // Outer ring
+            // Main Outer Body (Depth)
             Container(
-              width: 84,
-              height: 84,
+              width: 80,
+              height: 80,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    Colors.red.shade400,
-                    Colors.red.shade700,
+                    Colors.white.withOpacity(0.15),
+                    Colors.white.withOpacity(0.05),
                   ],
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withAlpha(60),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 15,
+                    spreadRadius: -2,
                   ),
                 ],
               ),
             ),
 
-            // Middle ring (metallic)
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Colors.grey.shade300,
-                    Colors.grey.shade100,
-                    Colors.grey.shade300,
-                  ],
-                  stops: const [0.0, 0.4, 1.0],
-                ),
-              ),
-            ),
-
-            // Inner button
+            // The Shutter "Plate"
             AnimatedContainer(
-              duration: const Duration(milliseconds: 100),
-              width: _isPressed ? 52 : 58,
-              height: _isPressed ? 52 : 58,
+              duration: const Duration(milliseconds: 150),
+              width: _isPressed ? 60 : 66,
+              height: _isPressed ? 60 : 66,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  center: const Alignment(-0.3, -0.3),
-                  radius: 0.8,
-                  colors: [
-                    Colors.white,
-                    Colors.grey.shade100,
-                  ],
-                ),
+                color: Colors.white,
                 boxShadow: _isPressed
                     ? []
                     : [
                         BoxShadow(
-                          color: Colors.black.withAlpha(40),
-                          blurRadius: 6,
-                          offset: const Offset(0, 3),
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
                         ),
                       ],
               ),
-            ),
-
-            // Processing indicator
-            if (widget.isProcessing)
-              SizedBox(
-                width: 50,
-                height: 50,
-                child: CircularProgressIndicator(
-                  strokeWidth: 3,
-                  valueColor: AlwaysStoppedAnimation(Colors.red.shade600),
+              child: Center(
+                child: Container(
+                  width: _isPressed ? 54 : 60,
+                  height: _isPressed ? 54 : 60,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.black.withOpacity(0.05),
+                      width: 1,
+                    ),
+                  ),
                 ),
               ),
+            ),
 
-            // Center dot
-            if (!widget.isProcessing)
-              Container(
-                width: 12,
-                height: 12,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.red.shade600,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.red.shade600.withAlpha(100),
-                      blurRadius: 8,
-                    ),
-                  ],
+            // Processing Indicator
+            if (widget.isProcessing)
+              SizedBox(
+                width: 76,
+                height: 76,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation(Colors.white.withOpacity(0.5)),
                 ),
               ),
           ],

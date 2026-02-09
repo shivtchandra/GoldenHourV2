@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:glass_kit/glass_kit.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/foundation.dart';
@@ -10,7 +9,7 @@ import 'package:image/image.dart' as img;
 import 'package:gal/gal.dart';
 import 'package:flutter/services.dart';
 
-import '../../../../app/theme/colors.dart';
+import '../../../../app/theme/theme_colors.dart';
 import '../../../../app/theme/typography.dart';
 import '../../../presets/data/models/preset_model.dart';
 import '../../../presets/data/repositories/preset_repository.dart';
@@ -23,6 +22,7 @@ import '../../../camera/providers/settings_provider.dart';
 class DevelopScreen extends ConsumerStatefulWidget {
   final File? imageFile;
   final CameraModel? initialCamera;
+  final PresetModel? initialPreset;
   final String? initialAspectRatio;
   final String? date;
   final bool showInstantBorder;
@@ -31,6 +31,7 @@ class DevelopScreen extends ConsumerStatefulWidget {
     super.key,
     this.imageFile,
     this.initialCamera,
+    this.initialPreset,
     this.initialAspectRatio,
     this.date,
     this.showInstantBorder = false,
@@ -55,18 +56,43 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
   int _activeTab = 0; // 0: Presets, 1: Adjust, 2: Frame
   String _selectedTool = 'Exposure';
   String _selectedAspectRatio = 'Original';
+  bool _hasAutoSwitchedTab = false;
 
   // Pipeline State
   late PipelineConfig _pipeline;
+  late PipelineConfig _capturePipeline;
+  String? _captureName;
+  Uint8List? _capturePreviewBytes;
 
   @override
   void initState() {
     super.initState();
     _pipeline = PipelineConfig.defaultConfig();
-    
+    _capturePipeline = PipelineConfig.defaultConfig();
+
+    // Load initial preset if provided
+    if (widget.initialPreset != null) {
+      _selectedPreset = widget.initialPreset;
+      _pipeline = widget.initialPreset!.pipeline;
+      _capturePipeline = widget.initialPreset!.pipeline;
+      _captureName = widget.initialPreset!.name;
+    }
+
+    if (widget.initialCamera != null) {
+      _pipeline = widget.initialCamera!.pipeline;
+      _capturePipeline = widget.initialCamera!.pipeline;
+      _captureName = widget.initialCamera!.name;
+    }
+
     // Default to provider's ratio if not passed specifically
     _selectedAspectRatio = widget.initialAspectRatio ?? ref.read(settingsProvider).aspectRatio;
-    
+
+    // Auto-switch to Adjust tab if photo was taken with preset
+    if (widget.initialPreset != null && _activeTab == 0) {
+      _activeTab = 1; // Switch to Adjust tab
+      _hasAutoSwitchedTab = true;
+    }
+
     if (widget.imageFile != null) {
       _currentFile = widget.imageFile;
       _loadAndProcessImage();
@@ -79,19 +105,47 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
 
     try {
       final bytes = await _currentFile!.readAsBytes();
-      final decoded = await compute(img.decodeImage, bytes);
+      
+      // Do the heavy lifting (decode + resize) in ONE isolate call.
+      // This minimizes memory spikes by resizing immediately inside the isolate.
+      final decoded = await compute(_decodeAndResizeTask, bytes);
+      
       if (decoded != null) {
         _originalImage = decoded;
-        // Apply initial camera/preset if provided
-        if (widget.initialCamera != null) {
-           _pipeline = widget.initialCamera!.pipeline;
-        }
+        
+        // We no longer pre-compute capturePreview because we'll use Image.file 
+        // for the "Original" view, which is much more stable and handled natively.
+        _capturePreviewBytes = null; 
+
         await _updatePreview();
       }
     } catch (e) {
-      debugPrint('Error loading image: $e');
+      debugPrint('DevelopScreen: Error loading image: $e');
     } finally {
       if (mounted) setState(() => _isProcessing = false);
+    }
+  }
+
+  static img.Image? _decodeAndResizeTask(Uint8List bytes) {
+    try {
+      var decoded = img.decodeImage(bytes);
+      if (decoded == null) return null;
+
+      // CRITICAL: Handle EXIF orientation (rotation) before resizing
+      // Otherwise images taken in portrait might appear landscape/squashed.
+      decoded = img.bakeOrientation(decoded);
+
+      const int maxDimension = 1200;
+      if (decoded.width > maxDimension || decoded.height > maxDimension) {
+        if (decoded.width > decoded.height) {
+          decoded = img.copyResize(decoded, width: maxDimension, interpolation: img.Interpolation.average);
+        } else {
+          decoded = img.copyResize(decoded, height: maxDimension, interpolation: img.Interpolation.average);
+        }
+      }
+      return decoded;
+    } catch (e) {
+      return null;
     }
   }
 
@@ -163,12 +217,13 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final tc = context.colors;
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: tc.scaffoldBackground,
       body: Stack(
         children: [
           _buildBackgroundGradient(),
-          
+
           SafeArea(
             child: Column(
               children: [
@@ -183,7 +238,7 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
               ],
             ),
           ),
-          
+
           if (_isSaving) _buildSavingOverlay(),
         ],
       ),
@@ -192,24 +247,21 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
 
   Widget _buildBackgroundGradient() {
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFF0F0F0F), Colors.black],
-        ),
+      decoration: BoxDecoration(
+        gradient: context.colors.backgroundGradient,
       ),
     );
   }
 
   Widget _buildHeader() {
+    final tc = context.colors;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           _glassIconButton(
-            icon: Icons.refresh_rounded, // Retake icon
+            icon: Icons.refresh_rounded,
             onPressed: () => Navigator.pop(context),
             tooltip: 'Retake',
           ),
@@ -219,13 +271,13 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
               fontSize: 16,
               fontWeight: FontWeight.w900,
               letterSpacing: 4,
-              color: AppColors.accentGold,
+              color: tc.accent,
             ),
           ),
           _glassIconButton(
             icon: Icons.check_rounded,
             onPressed: _savePhoto,
-            color: AppColors.accentGold,
+            color: tc.accent,
           ),
         ],
       ),
@@ -236,7 +288,8 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
     if (_currentFile == null) {
       return _buildImagePicker();
     }
-    
+
+    // Show the image - either processed or raw fallback
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -257,6 +310,7 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
     else if (widget.initialAspectRatio == '3:4') targetRatio = 3/4;
     else if (widget.initialAspectRatio == '16:9') targetRatio = 16/9;
 
+    final tc = context.colors;
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 32), // Significantly tighter margins
       decoration: BoxDecoration(
@@ -264,9 +318,9 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
         borderRadius: BorderRadius.circular(2),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.5),
+            color: Colors.black.withOpacity(tc.isDark ? 0.5 : 0.2),
             blurRadius: 40,
-            spreadRadius: 5,
+            spreadRadius: tc.isDark ? 5 : 2,
           ),
         ],
       ),
@@ -293,64 +347,105 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
   }
 
   Widget _buildImagePreview({bool noDecoration = false, BoxFit fit = BoxFit.contain}) {
+    final tc = context.colors;
+
+    // Determine the primary widget to show
+    Widget imageWidget;
+    
+    if (_showingOriginal) {
+      // ALWAYS use Image.file for original if available - it's handled natively
+      // and won't crash even with 48MP images.
+      if (_currentFile != null) {
+        imageWidget = Image.file(_currentFile!, fit: fit);
+      } else {
+        imageWidget = _buildImageError(tc, 'ORIGINAL NOT FOUND');
+      }
+    } else if (_displayBytes != null) {
+      // Show processed preview
+      imageWidget = Image.memory(
+        _displayBytes!,
+        fit: fit,
+        gaplessPlayback: true,
+        errorBuilder: (context, error, stackTrace) => _currentFile != null 
+            ? Image.file(_currentFile!, fit: fit) 
+            : _buildImageError(tc, 'DISPLAY ERROR'),
+      );
+    } else if (_currentFile != null) {
+      // Fallback: show original file directly while processing
+      imageWidget = Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.file(_currentFile!, fit: fit),
+          if (_isProcessing) 
+            Container(
+              color: Colors.black26,
+              child: Center(child: CircularProgressIndicator(color: tc.accent)),
+            ),
+        ],
+      );
+    } else {
+      imageWidget = _isProcessing 
+          ? Center(child: CircularProgressIndicator(color: tc.accent))
+          : _buildImageError(tc, 'NO IMAGE');
+    }
+
     final preview = GestureDetector(
       onLongPressStart: (_) => setState(() => _showingOriginal = true),
       onLongPressEnd: (_) => setState(() => _showingOriginal = false),
-      child: _isProcessing 
-        ? const Center(child: CircularProgressIndicator(color: AppColors.accentGold))
-        : _displayBytes != null
-          ? Image.memory(
-              _showingOriginal ? File(_currentFile!.path).readAsBytesSync() : _displayBytes!,
-              fit: fit,
-            )
-          : const SizedBox.shrink(),
+      child: imageWidget,
     );
 
     if (noDecoration) return preview;
 
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.5),
-                blurRadius: 30,
-                spreadRadius: 5,
+    return Flexible(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Flexible(
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(tc.isDark ? 0.5 : 0.15),
+                    blurRadius: 30,
+                    spreadRadius: tc.isDark ? 5 : 2,
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: preview,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (_pipeline.showDateStamp && !widget.showInstantBorder)
+                 Text(
+                  _pipeline.dateStampText ?? '',
+                  style: GoogleFonts.permanentMarker(
+                    fontSize: 14,
+                    color: tc.accentMuted,
+                  ),
+                ),
+              if (_pipeline.showDateStamp && !widget.showInstantBorder) const SizedBox(width: 12),
+              Text(
+                _showingOriginal 
+                    ? 'ORIGINAL (${_captureName?.toUpperCase() ?? 'RAW'})' 
+                    : (_selectedPreset != null ? '${_selectedPreset!.name.toUpperCase()} VIEW' : 'ENHANCED VIEW'),
+                style: GoogleFonts.spaceMono(
+                  fontSize: 10,
+                  color: _showingOriginal ? tc.accent : tc.textMuted,
+                  letterSpacing: 2,
+                ),
               ),
             ],
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: preview,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (_pipeline.showDateStamp && !widget.showInstantBorder)
-               Text(
-                _pipeline.dateStampText ?? '',
-                style: GoogleFonts.permanentMarker(
-                  fontSize: 14,
-                  color: AppColors.accentGold.withOpacity(0.5),
-                ),
-              ),
-            if (_pipeline.showDateStamp && !widget.showInstantBorder) const SizedBox(width: 12),
-            Text(
-              _showingOriginal ? 'ORIGINAL' : 'ENHANCED VIEW',
-              style: GoogleFonts.spaceMono(
-                fontSize: 10,
-                color: _showingOriginal ? AppColors.accentGold : Colors.white38,
-                letterSpacing: 2,
-              ),
-            ),
-          ],
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -378,6 +473,9 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
   Widget _buildToolShelf() {
     if (_currentFile == null) return const SizedBox.shrink();
 
+    // If photo was taken with a preset, hide the presets tab
+    final bool hidePresetsTab = widget.initialPreset != null;
+    
     return Container(
       padding: const EdgeInsets.only(bottom: 10),
       child: Column(
@@ -394,16 +492,16 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
             height: 60,
             margin: const EdgeInsets.symmetric(horizontal: 40),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
+              color: context.colors.glassBackground,
               borderRadius: BorderRadius.circular(30),
-              border: Border.all(color: Colors.white10),
+              border: Border.all(color: context.colors.borderSubtle),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _tabIcon(Icons.style_rounded, 0, 'PRESETS'),
-                _tabIcon(Icons.tune_rounded, 1, 'ADJUST'),
-                _tabIcon(Icons.crop_rounded, 2, 'FRAME'),
+                if (!hidePresetsTab) _tabIcon(Icons.style_rounded, 0, 'PRESETS'),
+                _tabIcon(Icons.tune_rounded, hidePresetsTab ? 0 : 1, 'ADJUST'),
+                _tabIcon(Icons.crop_rounded, hidePresetsTab ? 1 : 2, 'FRAME'),
               ],
             ),
           ),
@@ -413,15 +511,22 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
   }
 
   Widget _buildActiveToolContent() {
-    switch (_activeTab) {
-      case 0: // Presets
+    final bool hidePresetsTab = widget.initialPreset != null;
+    
+    // Adjust tab indices based on whether presets are hidden
+    final int presetsTabIndex = 0;
+    final int adjustTabIndex = hidePresetsTab ? 0 : 1;
+    final int frameTabIndex = hidePresetsTab ? 1 : 2;
+    
+    if (_activeTab == presetsTabIndex && !hidePresetsTab) {
+      // Presets tab (only shown when not shot with preset)
         final presets = PresetRepository.getAllPresets();
+        final tc = context.colors;
         return ListView.builder(
           scrollDirection: Axis.horizontal,
           itemCount: presets.length + 1,
           itemBuilder: (context, index) {
             if (index == 0) {
-              // The "Original" option
               final bool isSelected = _selectedPreset == null;
               return GestureDetector(
                 onTap: () {
@@ -442,15 +547,15 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(15),
                         border: Border.all(
-                          color: isSelected ? AppColors.accentGold : Colors.white10,
+                          color: isSelected ? tc.accent : tc.borderSubtle,
                           width: isSelected ? 2 : 1,
                         ),
-                        color: isSelected ? AppColors.accentGold.withOpacity(0.1) : Colors.white.withOpacity(0.02),
+                        color: isSelected ? tc.accent.withOpacity(0.1) : tc.glassBackground,
                       ),
                       child: Center(
                         child: Icon(
                           Icons.image_outlined,
-                          color: isSelected ? AppColors.accentGold : Colors.white54,
+                          color: isSelected ? tc.accent : tc.iconMuted,
                         ),
                       ),
                     ),
@@ -462,7 +567,7 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
                         style: GoogleFonts.spaceMono(
                           fontSize: 8,
                           fontWeight: FontWeight.bold,
-                          color: isSelected ? Colors.white : Colors.white38,
+                          color: isSelected ? tc.textPrimary : tc.textMuted,
                         ),
                       ),
                     ),
@@ -479,10 +584,9 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
                   _selectedPreset = preset;
                   _pipeline = preset.pipeline;
                 });
-                
-                // Set this as the active camera for the live viewfinder too
+
                 ref.read(settingsProvider.notifier).setActiveCamera(preset.id);
-                
+
                 _updatePreview();
               },
               child: Column(
@@ -496,15 +600,15 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(15),
                       border: Border.all(
-                        color: isSelected ? AppColors.accentGold : Colors.white10,
+                        color: isSelected ? tc.accent : tc.borderSubtle,
                         width: isSelected ? 2 : 1,
                       ),
-                      color: isSelected ? AppColors.accentGold.withOpacity(0.1) : Colors.white.withOpacity(0.02),
+                      color: isSelected ? tc.accent.withOpacity(0.1) : tc.glassBackground,
                     ),
                     child: Center(
                       child: Icon(
                         Icons.filter_hdr_rounded,
-                        color: isSelected ? AppColors.accentGold : Colors.white54,
+                        color: isSelected ? tc.accent : tc.iconMuted,
                       ),
                     ),
                   ),
@@ -516,7 +620,7 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
                       style: GoogleFonts.spaceMono(
                         fontSize: 8,
                         fontWeight: FontWeight.bold,
-                        color: isSelected ? Colors.white : Colors.white38,
+                        color: isSelected ? tc.textPrimary : tc.textMuted,
                       ),
                     ),
                   ),
@@ -525,7 +629,8 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
             );
           },
         );
-      case 1: // Adjustments
+    } else if (_activeTab == adjustTabIndex) {
+      // Adjustments tab
         return Column(
           children: [
             SingleChildScrollView(
@@ -563,7 +668,8 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
             _buildSleekSlider(),
           ],
         );
-      case 2: // Frame
+    } else if (_activeTab == frameTabIndex) {
+      // Frame tab
         return Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
@@ -573,8 +679,8 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
             _frameOption('16:9', Icons.panorama_horizontal_rounded),
           ],
         );
-      default:
-        return const SizedBox.shrink();
+    } else {
+      return const SizedBox.shrink();
     }
   }
 
@@ -606,21 +712,22 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
                 });
                 _updatePreview();
               },
-              activeColor: AppColors.accentGold,
+              activeColor: context.colors.accent,
             ),
           ],
         ),
       );
     }
 
+    final tc = context.colors;
     return SliderTheme(
       data: SliderThemeData(
-        activeTrackColor: AppColors.accentGold,
-        inactiveTrackColor: Colors.white10,
-        thumbColor: Colors.white,
+        activeTrackColor: tc.accent,
+        inactiveTrackColor: tc.borderSubtle,
+        thumbColor: tc.textPrimary,
         trackHeight: 2,
         thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-        overlayColor: AppColors.accentGold.withOpacity(0.1),
+        overlayColor: tc.accent.withOpacity(0.1),
       ),
       child: Slider(
         value: value,
@@ -649,6 +756,7 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
   }
 
   Widget _toolButton(String title, IconData icon) {
+    final tc = context.colors;
     bool active = _selectedTool == title;
     return GestureDetector(
       onTap: () => setState(() => _selectedTool = title),
@@ -656,15 +764,15 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         margin: const EdgeInsets.only(right: 8),
         decoration: BoxDecoration(
-          color: active ? AppColors.accentGold.withOpacity(0.1) : Colors.transparent,
+          color: active ? tc.accent.withOpacity(0.1) : Colors.transparent,
           borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: active ? AppColors.accentGold : Colors.white10),
+          border: Border.all(color: active ? tc.accent : tc.borderSubtle),
         ),
         child: Row(
           children: [
-            Icon(icon, size: 14, color: active ? AppColors.accentGold : Colors.white54),
+            Icon(icon, size: 14, color: active ? tc.accent : tc.iconMuted),
             const SizedBox(width: 8),
-            Text(title.toUpperCase(), style: GoogleFonts.spaceMono(fontSize: 9, color: active ? Colors.white : Colors.white38)),
+            Text(title.toUpperCase(), style: GoogleFonts.spaceMono(fontSize: 9, color: active ? tc.textPrimary : tc.textMuted)),
           ],
         ),
       ),
@@ -672,6 +780,7 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
   }
 
   Widget _tabIcon(IconData icon, int index, String label) {
+    final tc = context.colors;
     bool active = _activeTab == index;
     return GestureDetector(
       onTap: () => setState(() => _activeTab = index),
@@ -679,7 +788,7 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         child: Icon(
           icon,
-          color: active ? AppColors.accentGold : Colors.white24,
+          color: active ? tc.accent : tc.textFaint,
           size: 22,
         ),
       ),
@@ -687,6 +796,7 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
   }
 
   Widget _frameOption(String label, IconData icon) {
+    final tc = context.colors;
     bool active = _selectedAspectRatio == label;
     return GestureDetector(
       onTap: () {
@@ -704,16 +814,16 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
             width: 54,
             height: 54,
             decoration: BoxDecoration(
-              color: active ? AppColors.accentGold.withOpacity(0.1) : Colors.white.withOpacity(0.02),
+              color: active ? tc.accent.withOpacity(0.1) : tc.glassBackground,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: active ? AppColors.accentGold : Colors.white10,
+                color: active ? tc.accent : tc.borderSubtle,
                 width: active ? 1.5 : 1,
               ),
             ),
             child: Icon(
               icon,
-              color: active ? AppColors.accentGold : Colors.white24,
+              color: active ? tc.accent : tc.textFaint,
               size: 24,
             ),
           ),
@@ -723,7 +833,7 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
             style: GoogleFonts.spaceMono(
               fontSize: 10,
               fontWeight: active ? FontWeight.bold : FontWeight.normal,
-              color: active ? Colors.white : Colors.white24,
+              color: active ? tc.textPrimary : tc.textFaint,
               letterSpacing: 1,
             ),
           ),
@@ -732,44 +842,62 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
     );
   }
 
-  Widget _glassIconButton({required IconData icon, required VoidCallback onPressed, Color color = Colors.white, String? tooltip}) {
+  Widget _glassIconButton({required IconData icon, required VoidCallback onPressed, Color? color, String? tooltip}) {
+    final tc = context.colors;
     return Tooltip(
       message: tooltip ?? '',
-      child: GlassContainer.clearGlass(
+      child: AdaptiveGlass(
         width: 48,
         height: 48,
         borderRadius: BorderRadius.circular(24),
         borderColor: Colors.transparent,
         child: IconButton(
-          icon: Icon(icon, color: color, size: 24),
+          icon: Icon(icon, color: color ?? tc.iconPrimary, size: 24),
           onPressed: onPressed,
         ),
       ),
     );
   }
 
+  Widget _buildImageError(dynamic tc, String message) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.broken_image_outlined, color: tc.textMuted, size: 48),
+          const SizedBox(height: 16),
+          Text(
+            message,
+            style: GoogleFonts.spaceMono(fontSize: 10, color: tc.textMuted, letterSpacing: 2),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _resetToOriginal() {
     setState(() {
-      _pipeline = PipelineConfig.defaultConfig();
-      _selectedAspectRatio = 'Original';
+      _pipeline = _capturePipeline;
+      _selectedAspectRatio = widget.initialAspectRatio ?? 'Original';
+      _selectedPreset = widget.initialPreset;
     });
   }
 
   Widget _buildSourceButton({required IconData icon, required String label, required VoidCallback onTap}) {
+    final tc = context.colors;
     return GestureDetector(
       onTap: onTap,
-      child: GlassContainer(
+      child: AdaptiveGlass(
         height: 120,
         width: 240,
         borderRadius: BorderRadius.circular(20),
-        gradient: LinearGradient(colors: [Colors.white.withOpacity(0.05), Colors.white.withOpacity(0.02)]),
-        borderColor: Colors.white10,
+        borderColor: tc.borderSubtle,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: AppColors.accentGold, size: 32),
+            Icon(icon, color: tc.accent, size: 32),
             const SizedBox(height: 12),
-            Text(label, style: GoogleFonts.spaceMono(fontSize: 10, color: Colors.white70, letterSpacing: 2)),
+            Text(label, style: GoogleFonts.spaceMono(fontSize: 10, color: tc.textSecondary, letterSpacing: 2)),
           ],
         ),
       ),
@@ -777,17 +905,18 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
   }
 
   Widget _buildSavingOverlay() {
+    final tc = context.colors;
     return Container(
-      color: Colors.black87,
+      color: tc.isDark ? Colors.black87 : Colors.white.withOpacity(0.9),
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const CircularProgressIndicator(color: AppColors.accentGold),
+            CircularProgressIndicator(color: tc.accent),
             const SizedBox(height: 20),
             Text(
               'EXPORTING MASTERPIECE...',
-              style: GoogleFonts.spaceMono(color: AppColors.accentGold, letterSpacing: 3, fontSize: 12),
+              style: GoogleFonts.spaceMono(color: tc.accent, letterSpacing: 3, fontSize: 12),
             ),
           ],
         ),
@@ -795,14 +924,21 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
     );
   }
 
-  final ImagePicker _picker = ImagePicker();
   Future<void> _pickImage(ImageSource source) async {
-    final file = await _picker.pickImage(source: source);
+    final file = await _picker.pickImage(
+      source: source,
+      maxWidth: 1200, 
+      maxHeight: 1200,
+      imageQuality: 90,
+    );
     if (file != null) {
-      setState(() {
-        _currentFile = File(file.path);
-      });
-      _loadAndProcessImage();
+      final pickedFile = File(file.path);
+      if (await pickedFile.exists()) {
+        setState(() {
+          _currentFile = pickedFile;
+        });
+        _loadAndProcessImage();
+      }
     }
   }
 
@@ -816,7 +952,7 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
         'image': _originalImage!,
         'pipeline': pipeline,
         'aspectRatio': _selectedAspectRatio,
-        'isPreview': false, // Full resolution
+        'isPreview': false, 
         'date': pipeline.showDateStamp ? (pipeline.dateStampText ?? widget.date) : null,
       });
       
@@ -824,19 +960,22 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
       final uint8Bytes = Uint8List.fromList(bytes);
       
       await Gal.putImageBytes(uint8Bytes);
+      
+      String saveId = _selectedPreset?.id ?? widget.initialCamera?.id ?? 'custom';
+      
       await PhotoStorageService.instance.saveProcessedPhoto(
         bytes: uint8Bytes,
-        cameraId: _selectedPreset?.id ?? 'custom',
+        cameraId: saveId,
       );
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('SAVED TO GALLERY'), backgroundColor: AppColors.accentGold),
+          SnackBar(content: const Text('SAVED TO GALLERY'), backgroundColor: context.colors.accent),
         );
         Navigator.pop(context, true);
       }
     } catch (e) {
-      debugPrint('Save error: $e');
+      debugPrint('DevelopScreen: Save error: $e');
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }

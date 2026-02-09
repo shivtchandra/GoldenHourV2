@@ -1,9 +1,8 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../../../app/theme/colors.dart';
+import '../../../../app/theme/theme_colors.dart';
 import '../../../../app/theme/typography.dart';
 import '../../data/models/preset_model.dart';
-import '../../../camera/data/models/pipeline_config.dart';
 
 /// Premium glassmorphic preset selection card
 class PresetCard extends StatelessWidget {
@@ -24,13 +23,14 @@ class PresetCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = context.colors;
     return RepaintBoundary(
       child: GestureDetector(
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeOutCubic,
-          transform: isSelected 
+          transform: isSelected
               ? (Matrix4.identity()..scale(1.02))
               : Matrix4.identity(),
           child: Container(
@@ -55,20 +55,20 @@ class PresetCard extends StatelessWidget {
               child: Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
-                  color: Colors.grey[900]?.withAlpha(200),
+                  color: tc.cardSurface.withAlpha(200),
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      preset.category.accentColor.withAlpha(60),
-                      preset.category.accentColor.withAlpha(20),
-                      Colors.black.withAlpha(200),
+                      preset.category.accentColor.withAlpha(tc.isDark ? 60 : 40),
+                      preset.category.accentColor.withAlpha(tc.isDark ? 20 : 10),
+                      tc.isDark ? Colors.black.withAlpha(200) : tc.cardSurface,
                     ],
                   ),
                   border: Border.all(
                     color: isSelected
                         ? preset.category.accentColor.withAlpha(180)
-                        : Colors.white.withAlpha(30),
+                        : tc.isDark ? Colors.white.withAlpha(30) : Colors.black.withAlpha(15),
                     width: isSelected ? 1.5 : 0.8,
                   ),
                 ),
@@ -99,11 +99,11 @@ class PresetCard extends StatelessWidget {
                           padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Colors.black.withOpacity(0.3),
+                            color: tc.overlayDark,
                           ),
                           child: Icon(
                             isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                            color: isFavorite ? Colors.redAccent : Colors.white.withOpacity(0.6),
+                            color: isFavorite ? tc.favorite : tc.iconMuted,
                             size: 16,
                           ),
                         ),
@@ -177,10 +177,10 @@ class PresetCard extends StatelessWidget {
                             style: AppTypography.headlineMedium.copyWith(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              color: Colors.white,
+                              color: tc.textPrimary,
                               shadows: [
                                 Shadow(
-                                  color: Colors.black.withAlpha(100),
+                                  color: Colors.black.withAlpha(tc.isDark ? 100 : 30),
                                   blurRadius: 4,
                                 ),
                               ],
@@ -197,10 +197,10 @@ class PresetCard extends StatelessWidget {
                               vertical: 5,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.black.withAlpha(100),
+                              color: tc.isDark ? Colors.black.withAlpha(100) : Colors.black.withAlpha(20),
                               borderRadius: BorderRadius.circular(6),
                               border: Border.all(
-                                color: Colors.white.withAlpha(30),
+                                color: tc.isDark ? Colors.white.withAlpha(30) : Colors.black.withAlpha(15),
                               ),
                             ),
                             child: Text(
@@ -247,6 +247,7 @@ class PresetCard extends StatelessWidget {
   }
 
   Widget _buildBadge() {
+    // PRO badge stays gold in both themes
     if (preset.isPro) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -278,22 +279,27 @@ class PresetCard extends StatelessWidget {
         ),
       );
     } else {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: Colors.white10,
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: Colors.white24),
-        ),
-        child: Text(
-          'FREE',
-          style: AppTypography.labelLarge.copyWith(
-            fontSize: 10,
-            color: Colors.white70,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1,
-          ),
-        ),
+      return Builder(
+        builder: (context) {
+          final tc = context.colors;
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: tc.glassBackground,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: tc.borderMuted),
+            ),
+            child: Text(
+              'FREE',
+              style: AppTypography.labelLarge.copyWith(
+                fontSize: 10,
+                color: tc.textSecondary,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1,
+              ),
+            ),
+          );
+        },
       );
     }
   }

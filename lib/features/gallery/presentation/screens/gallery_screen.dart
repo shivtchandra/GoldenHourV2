@@ -1,8 +1,10 @@
 import 'dart:io';
 import 'package:film_cam/app/theme/colors.dart';
+import 'package:film_cam/app/theme/theme_colors.dart';
 import 'package:film_cam/app/theme/typography.dart';
 import 'package:film_cam/core/services/photo_storage_service.dart';
 import 'package:film_cam/features/camera/data/repositories/camera_repository.dart';
+import 'package:film_cam/features/presets/data/repositories/preset_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:glass_kit/glass_kit.dart';
 import 'package:animate_do/animate_do.dart';
@@ -51,36 +53,37 @@ class _GalleryScreenState extends State<GalleryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final tc = context.colors;
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: tc.scaffoldBackground,
       extendBodyBehindAppBar: true,
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(70),
-        child: GlassContainer.clearGlass(
+        child: AdaptiveGlass(
           height: 100,
           width: double.infinity,
           borderRadius: BorderRadius.zero,
           borderWidth: 0,
-          borderColor: Colors.transparent, // Fix for assertion
+          borderColor: Colors.transparent,
           child: SafeArea(
             bottom: false,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 IconButton(
-                  icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+                  icon: Icon(Icons.arrow_back_ios_new_rounded, color: tc.iconPrimary, size: 20),
                   onPressed: () => Navigator.pop(context),
                 ),
                 Text(
                   'GALLERY',
                   style: AppTypography.displayMedium.copyWith(
                     fontSize: 18,
-                    color: AppColors.accentGold,
+                    color: tc.accent,
                     letterSpacing: 6,
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
+                  icon: Icon(Icons.refresh_rounded, color: tc.iconPrimary, size: 20),
                   onPressed: _loadPhotos,
                 ),
               ],
@@ -93,9 +96,10 @@ class _GalleryScreenState extends State<GalleryScreen> {
   }
 
   Widget _buildBody() {
+    final tc = context.colors;
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: AppColors.gold),
+      return Center(
+        child: CircularProgressIndicator(color: tc.accent),
       );
     }
 
@@ -104,9 +108,9 @@ class _GalleryScreenState extends State<GalleryScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, color: Colors.red, size: 48),
+            Icon(Icons.error_outline, color: tc.error, size: 48),
             const SizedBox(height: 16),
-            Text('Error: $_errorMessage', style: const TextStyle(color: Colors.white)),
+            Text('Error: $_errorMessage', style: TextStyle(color: tc.textPrimary)),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _loadPhotos,
@@ -125,6 +129,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
   }
 
   Widget _buildEmptyState() {
+    final tc = context.colors;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -132,13 +137,13 @@ class _GalleryScreenState extends State<GalleryScreen> {
           Icon(
             Icons.auto_awesome_mosaic_outlined,
             size: 80,
-            color: AppColors.accentGold.withOpacity(0.2),
+            color: tc.accentMuted,
           ),
           const SizedBox(height: 32),
           Text(
             'STORY UNTOLD',
             style: AppTypography.displayMedium.copyWith(
-              color: AppColors.accentGold.withOpacity(0.6),
+              color: tc.accentSecondary,
               letterSpacing: 4,
             ),
           ),
@@ -146,7 +151,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
           Text(
             'Your masterpiece collection is empty.',
             style: AppTypography.bodySmall.copyWith(
-              color: Colors.white30,
+              color: tc.textMuted,
               letterSpacing: 1,
             ),
           ),
@@ -156,10 +161,11 @@ class _GalleryScreenState extends State<GalleryScreen> {
   }
 
   Widget _buildPhotoGrid() {
+    final tc = context.colors;
     return RefreshIndicator(
       onRefresh: _loadPhotos,
-      color: AppColors.accentGold,
-      backgroundColor: Colors.black,
+      color: tc.accent,
+      backgroundColor: tc.scaffoldBackground,
       child: GridView.builder(
         padding: EdgeInsets.only(
           top: MediaQuery.of(context).padding.top + 80,
@@ -196,18 +202,46 @@ class _GalleryScreenState extends State<GalleryScreen> {
         }
       },
       onLongPress: () => _showDeleteDialog(photo),
-      child: Container(
-        color: Colors.black,
-        child: exists
-            ? Image.file(
-                file,
-                fit: BoxFit.cover,
-                cacheWidth: 400,
-                errorBuilder: (_, error, __) {
-                  return const Center(child: Icon(Icons.broken_image, color: Colors.white10));
-                },
-              )
-            : const Center(child: Icon(Icons.image_not_supported, color: Colors.white10)),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Container(
+            color: context.colors.scaffoldBackground,
+            child: exists
+                ? Image.file(
+                    file,
+                    fit: BoxFit.cover,
+                    cacheWidth: 400,
+                    errorBuilder: (_, error, __) {
+                      return Center(child: Icon(Icons.broken_image, color: context.colors.textGhost));
+                    },
+                  )
+                : Center(child: Icon(Icons.image_not_supported, color: context.colors.textGhost)),
+          ),
+          // Info Overlay
+          Positioned(
+            bottom: 6,
+            left: 6,
+            right: 6,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                _getPhotoLabel(photo.cameraId),
+                style: AppTypography.monoSmall.copyWith(
+                  fontSize: 7,
+                  color: Colors.white,
+                  letterSpacing: 0.5,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -225,20 +259,21 @@ class _GalleryScreenState extends State<GalleryScreen> {
   }
 
   Future<void> _showDeleteDialog(PhotoInfo photo) async {
+    final tc = context.colors;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: Colors.grey.shade900,
-        title: Text('DELETE ARTWORK?', style: AppTypography.labelLarge.copyWith(color: Colors.white)),
-        content: Text('This will permanently remove the memory.', style: AppTypography.bodySmall.copyWith(color: Colors.white70)),
+        backgroundColor: context.colors.dialogBackground,
+        title: Text('DELETE ARTWORK?', style: AppTypography.labelLarge.copyWith(color: context.colors.textPrimary)),
+        content: Text('This will permanently remove the memory.', style: AppTypography.bodySmall.copyWith(color: context.colors.textSecondary)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('CANCEL', style: AppTypography.labelMedium.copyWith(color: Colors.white54)),
+            child: Text('CANCEL', style: AppTypography.labelMedium.copyWith(color: context.colors.textTertiary)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text('DELETE', style: AppTypography.labelMedium.copyWith(color: Colors.redAccent)),
+            child: Text('DELETE', style: AppTypography.labelMedium.copyWith(color: context.colors.error)),
           ),
         ],
       ),
@@ -248,6 +283,23 @@ class _GalleryScreenState extends State<GalleryScreen> {
       await PhotoStorageService.instance.deletePhoto(photo.path);
       _loadPhotos();
     }
+  }
+
+  String _getPhotoLabel(String id) {
+    // First check if it's a camera
+    final camera = CameraRepository.getCameraById(id);
+    if (camera != null) {
+      return camera.name.toUpperCase();
+    }
+    
+    // Then check if it's a preset
+    final preset = PresetRepository.getPresetById(id);
+    if (preset != null) {
+      return preset.name.toUpperCase();
+    }
+    
+    // Fallback
+    return 'KODAK';
   }
 }
 
@@ -259,7 +311,9 @@ class _FullScreenViewer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Full screen photo viewer stays dark - industry standard
     final camera = CameraRepository.getCameraById(photo.cameraId);
+    final preset = PresetRepository.getPresetById(photo.cameraId);
     final file = File(photo.path);
 
     return Scaffold(
@@ -274,7 +328,7 @@ class _FullScreenViewer extends StatelessWidget {
         title: Column(
           children: [
             Text(
-              camera?.name.toUpperCase() ?? 'PHOTO',
+              camera?.name.toUpperCase() ?? preset?.name.toUpperCase() ?? 'PHOTO',
               style: AppTypography.labelLarge.copyWith(color: Colors.white, fontSize: 14, letterSpacing: 2),
             ),
             Text(
@@ -291,8 +345,8 @@ class _FullScreenViewer extends StatelessWidget {
               final confirmed = await showDialog<bool>(
                 context: context,
                 builder: (ctx) => AlertDialog(
-                  backgroundColor: Colors.grey.shade900,
-                  title: Text('REMOVE?', style: AppTypography.labelLarge.copyWith(color: Colors.white)),
+                  backgroundColor: ctx.colors.dialogBackground,
+                  title: Text('REMOVE?', style: AppTypography.labelLarge.copyWith(color: ctx.colors.textPrimary)),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(ctx, false),
@@ -300,7 +354,7 @@ class _FullScreenViewer extends StatelessWidget {
                     ),
                     TextButton(
                       onPressed: () => Navigator.pop(ctx, true),
-                      child: const Text('DELETE', style: TextStyle(color: Colors.redAccent)),
+                      child: Text('DELETE', style: TextStyle(color: ctx.colors.error)),
                     ),
                   ],
                 ),

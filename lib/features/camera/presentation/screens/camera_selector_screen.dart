@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:glass_kit/glass_kit.dart';
 import '../../../../app/theme/colors.dart';
+import '../../../../app/theme/theme_colors.dart';
 import '../../../../app/theme/typography.dart';
 import '../../data/models/camera_model.dart';
 import '../../data/repositories/camera_repository.dart';
 import '../widgets/camera_card.dart';
 import 'package:animate_do/animate_do.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../providers/settings_provider.dart';
+import '../../../settings/providers/user_provider.dart';
+import '../../../settings/presentation/screens/profile_screen.dart';
 
-class CameraSelectorScreen extends StatefulWidget {
+class CameraSelectorScreen extends ConsumerStatefulWidget {
   final CameraModel currentCamera;
   final Function(CameraModel)? onCameraSelected;
 
@@ -18,27 +23,14 @@ class CameraSelectorScreen extends StatefulWidget {
   });
 
   @override
-  State<CameraSelectorScreen> createState() => _CameraSelectorScreenState();
+  ConsumerState<CameraSelectorScreen> createState() => _CameraSelectorScreenState();
 }
 
-class _CameraSelectorScreenState extends State<CameraSelectorScreen> {
+class _CameraSelectorScreenState extends ConsumerState<CameraSelectorScreen> {
   String _selectedFilter = 'ALL';
   String _searchQuery = '';
   late List<CameraModel> _allCameras;
   late List<CameraModel> _filteredCameras;
-
-  final Set<String> _unlockedCameraIds = {
-    'kodak_gold_200', 'fuji_superia_400', 'ilford_hp5',
-    'kodak_portra_400', 'kodak_ektar_100', 'cinestill_800t',
-    'fuji_pro_400h', 'kodak_colorplus_200', 'kodak_ultramax_400',
-    'fuji_c200', 'fuji_velvia_50', 'fuji_provia_100f',
-    'lomo_800', 'agfa_vista_200', 'kodak_vision3_500t',
-    'kodak_trix_400', 'kodak_tmax_400', 'ilford_delta_3200',
-    'fomapan_400', 'rollei_retro_400s', 'lomo_redscale',
-    'lomo_purple', 'aerochrome', 'xpro_slide', 'expired_film',
-    'polaroid_600', 'polaroid_sx70', 'fuji_instax',
-    'holga_plastic', 'diana_f_plus',
-  };
 
   @override
   void initState() {
@@ -84,6 +76,7 @@ class _CameraSelectorScreenState extends State<CameraSelectorScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final tc = context.colors;
     final body = Stack(
       children: [
         // Background Glow
@@ -95,13 +88,13 @@ class _CameraSelectorScreenState extends State<CameraSelectorScreen> {
             height: 300,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppColors.accentGold.withOpacity(0.05),
+              color: tc.accentSubtle,
             ),
           ),
         ),
-        
+
         SafeArea(
-          bottom: widget.onCameraSelected == null, // Only safe area bottom if not embedded
+          bottom: widget.onCameraSelected == null,
           child: Column(
             children: [
               _buildRoyalHeader(),
@@ -120,16 +113,17 @@ class _CameraSelectorScreenState extends State<CameraSelectorScreen> {
     );
 
     if (widget.onCameraSelected != null) {
-      return body; // Return only body if embedded
+      return body;
     }
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: tc.scaffoldBackground,
       body: body,
     );
   }
 
   Widget _buildRoyalHeader() {
+    final tc = context.colors;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: FadeInDown(
@@ -148,7 +142,7 @@ class _CameraSelectorScreenState extends State<CameraSelectorScreen> {
               style: AppTypography.displayMedium.copyWith(
                 fontSize: 18,
                 letterSpacing: 4,
-                color: AppColors.accentGold,
+                color: tc.accent,
               ),
             ),
             _glassIconButton(
@@ -162,26 +156,27 @@ class _CameraSelectorScreenState extends State<CameraSelectorScreen> {
   }
 
   Widget _glassIconButton({required IconData icon, required VoidCallback onPressed}) {
-    return GlassContainer.clearGlass(
+    return AdaptiveGlass(
       width: 48,
       height: 48,
       borderRadius: BorderRadius.circular(24),
-      borderColor: Colors.transparent, // Fix for assertion
+      borderColor: Colors.transparent,
       child: IconButton(
-        icon: Icon(icon, color: Colors.white, size: 20),
+        icon: Icon(icon, color: context.colors.iconPrimary, size: 20),
         onPressed: onPressed,
       ),
     );
   }
 
   Widget _buildRoyalSearchBar() {
+    final tc = context.colors;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      child: GlassContainer.clearGlass(
+      child: AdaptiveGlass(
         height: 56,
         width: double.infinity,
         borderRadius: BorderRadius.circular(28),
-        borderColor: Colors.transparent, // Fix for assertion
+        borderColor: Colors.transparent,
         child: TextField(
           onChanged: (v) {
             setState(() {
@@ -189,11 +184,11 @@ class _CameraSelectorScreenState extends State<CameraSelectorScreen> {
               _filterCameras(_selectedFilter);
             });
           },
-          style: AppTypography.bodyLarge.copyWith(color: Colors.white),
+          style: AppTypography.bodyLarge.copyWith(color: tc.textPrimary),
           decoration: InputDecoration(
             hintText: 'Search collection...',
-            hintStyle: AppTypography.bodyLarge.copyWith(color: Colors.white38),
-            prefixIcon: const Icon(Icons.search_rounded, color: AppColors.accentGold),
+            hintStyle: AppTypography.bodyLarge.copyWith(color: tc.textMuted),
+            prefixIcon: Icon(Icons.search_rounded, color: tc.accent),
             border: InputBorder.none,
             contentPadding: const EdgeInsets.symmetric(vertical: 18),
           ),
@@ -203,6 +198,7 @@ class _CameraSelectorScreenState extends State<CameraSelectorScreen> {
   }
 
   Widget _buildRoyalFilterChips() {
+    final tc = context.colors;
     final filters = [
       {'label': 'ALL', 'value': 'ALL'},
       {'label': 'FREE', 'value': 'FREE'},
@@ -227,25 +223,25 @@ class _CameraSelectorScreenState extends State<CameraSelectorScreen> {
             onTap: () => _filterCameras(filter['value']!),
             child: GlassContainer(
               height: 42,
-              width: index == 0 ? 80 : 100, // Dynamic width for chips
+              width: index == 0 ? 80 : 100,
               padding: const EdgeInsets.symmetric(horizontal: 20),
               borderRadius: BorderRadius.circular(25),
-              borderColor: Colors.transparent, // Fix for assertion
+              borderColor: Colors.transparent,
               gradient: LinearGradient(
-                colors: isSelected 
-                  ? [AppColors.accentGold.withOpacity(0.3), AppColors.accentGold.withOpacity(0.1)]
-                  : [Colors.white.withOpacity(0.05), Colors.white.withOpacity(0.01)],
+                colors: isSelected
+                  ? [tc.accent.withOpacity(0.3), tc.accent.withOpacity(0.1)]
+                  : [tc.glassBackground, tc.glassBackground.withOpacity(0.01)],
               ),
               borderGradient: LinearGradient(
-                colors: isSelected 
-                  ? [AppColors.accentGold, AppColors.accentGold.withOpacity(0.2)]
-                  : [Colors.white.withOpacity(0.1), Colors.white.withOpacity(0.05)],
+                colors: isSelected
+                  ? [tc.accent, tc.accent.withOpacity(0.2)]
+                  : [tc.glassBorder, tc.glassBorder.withOpacity(0.5)],
               ),
               child: Center(
                 child: Text(
                   filter['label']!,
                   style: AppTypography.labelMedium.copyWith(
-                    color: isSelected ? AppColors.accentGold : Colors.white60,
+                    color: isSelected ? tc.accent : tc.iconMuted,
                     letterSpacing: 2,
                   ),
                 ),
@@ -258,15 +254,16 @@ class _CameraSelectorScreenState extends State<CameraSelectorScreen> {
   }
 
   Widget _buildEmptyState() {
+    final tc = context.colors;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.camera_roll_outlined, size: 64, color: AppColors.accentGold.withOpacity(0.1)),
+          Icon(Icons.camera_roll_outlined, size: 64, color: tc.accentSubtle),
           const SizedBox(height: 16),
           Text(
             'VAULT IS EMPTY',
-            style: AppTypography.displaySmall.copyWith(color: Colors.white24, letterSpacing: 2),
+            style: AppTypography.displaySmall.copyWith(color: tc.textFaint, letterSpacing: 2),
           ),
         ],
       ),
@@ -274,6 +271,8 @@ class _CameraSelectorScreenState extends State<CameraSelectorScreen> {
   }
 
   Widget _buildCameraGrid() {
+    final user = ref.watch(userProfileProvider);
+
     return GridView.builder(
       padding: const EdgeInsets.all(20),
       cacheExtent: 500, // Pre-render some items
@@ -288,7 +287,7 @@ class _CameraSelectorScreenState extends State<CameraSelectorScreen> {
       itemCount: _filteredCameras.length,
       itemBuilder: (context, index) {
         final camera = _filteredCameras[index];
-        final isUnlocked = _unlockedCameraIds.contains(camera.id);
+        final isUnlocked = !camera.isPro || user.isPro;
         final isSelected = camera.id == widget.currentCamera.id;
 
         return FadeIn(
@@ -298,14 +297,16 @@ class _CameraSelectorScreenState extends State<CameraSelectorScreen> {
             isSelected: isSelected,
             isUnlocked: isUnlocked,
             isFavorite: CameraRepository.isFavorite(camera.id),
-            onLike: () {
-              setState(() {
-                CameraRepository.toggleFavorite(camera.id);
-                // Refresh list if we are in 'LIKED' mode
-                if (_selectedFilter == 'LIKED') {
-                  _filteredCameras = CameraRepository.getFavoriteCameras();
-                }
-              });
+            onLike: () async {
+              await CameraRepository.toggleFavorite(camera.id);
+              if (mounted) {
+                setState(() {
+                  // Refresh list if we are in 'LIKED' mode
+                  if (_selectedFilter == 'LIKED') {
+                    _filteredCameras = CameraRepository.getFavoriteCameras();
+                  }
+                });
+              }
             },
             onTap: () {
               if (isUnlocked) {
@@ -314,11 +315,45 @@ class _CameraSelectorScreenState extends State<CameraSelectorScreen> {
                 } else {
                   Navigator.pop(context, camera);
                 }
+              } else {
+                _showUpgradeDialog(context);
               }
             },
           ),
         );
       },
+    );
+  }
+
+  void _showUpgradeDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: context.colors.scaffoldBackground,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('ROYAL UPGRADE REQUIRED', 
+          style: AppTypography.displaySmall.copyWith(fontSize: 18, color: context.colors.accent, letterSpacing: 2)),
+        content: Text('Unlock the full creative vault with a Royal Membership. Access all 30 premium film stocks, unlimited captures, and high-res development.',
+          style: AppTypography.bodyMedium.copyWith(color: context.colors.textSecondary)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('LATER', style: AppTypography.monoMedium.copyWith(color: context.colors.textMuted)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: context.colors.accent,
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text('UPGRADE NOW', style: AppTypography.monoMedium.copyWith(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
     );
   }
 }

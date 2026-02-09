@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../../app/theme/colors.dart';
 import '../../../../app/theme/typography.dart';
+import '../../../../app/theme/theme_colors.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../home/presentation/screens/home_screen.dart';
 import '../../../onboarding/presentation/screens/onboarding_screen.dart';
+import '../../../../features/auth/presentation/screens/login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -23,18 +24,23 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _checkOnboardingStatus() async {
     await Future.delayed(const Duration(seconds: 3));
-    
+
     final prefs = await SharedPreferences.getInstance();
     final hasCompletedOnboarding = prefs.getBool('has_completed_onboarding') ?? false;
+    final isAuthenticated = prefs.getBool('is_authenticated') ?? false;
 
     if (mounted) {
-      if (hasCompletedOnboarding) {
+      if (!hasCompletedOnboarding) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+        );
+      } else if (!isAuthenticated) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
         );
       } else {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
       }
     }
@@ -42,8 +48,9 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final tc = context.colors;
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: tc.scaffoldBackground,
       body: Stack(
         children: [
           // Background Glow
@@ -55,7 +62,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    AppColors.accentGold.withOpacity(0.15),
+                    tc.accent.withOpacity(0.15),
                     Colors.transparent,
                   ],
                 ),
@@ -63,7 +70,7 @@ class _SplashScreenState extends State<SplashScreen> {
             ).animate(onPlay: (c) => c.repeat(reverse: true))
              .scale(duration: 2.seconds, begin: const Offset(0.8, 0.8), end: const Offset(1.2, 1.2)),
           ),
-          
+
           Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -76,35 +83,38 @@ class _SplashScreenState extends State<SplashScreen> {
                     height: 120,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.accentGold, width: 2),
+                      border: Border.all(color: tc.accent, width: 2),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.accentGold.withOpacity(0.3),
+                          color: tc.accent.withOpacity(0.3),
                           blurRadius: 30,
                           spreadRadius: 5,
                         ),
                       ],
                     ),
-                    child: const Center(
-                      child: Icon(Icons.camera_rounded, size: 60, color: AppColors.accentGold),
+                    child: Center(
+                      child: Icon(Icons.camera_rounded, size: 60, color: tc.accent),
                     ),
                   ),
                 ),
-                
+
                 const SizedBox(height: 48),
-                
+
                 // Royal Title
                 FadeInUp(
                   duration: const Duration(milliseconds: 1500),
                   delay: const Duration(milliseconds: 500),
                   child: Column(
                     children: [
-                      Text(
-                        'FILMCAM',
-                        style: AppTypography.displayLarge.copyWith(
-                          fontSize: 40,
-                          letterSpacing: 12,
-                          color: AppColors.accentGold,
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          'GOLDENHOUR',
+                          style: AppTypography.displayLarge.copyWith(
+                            fontSize: 32,
+                            letterSpacing: 10,
+                            color: tc.accent,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -112,7 +122,7 @@ class _SplashScreenState extends State<SplashScreen> {
                         'CAPTURE THE ETERNAL',
                         style: AppTypography.monoMedium.copyWith(
                           letterSpacing: 4,
-                          color: Colors.white70,
+                          color: tc.textSecondary,
                           fontSize: 10,
                         ),
                       ),
@@ -135,8 +145,8 @@ class _SplashScreenState extends State<SplashScreen> {
                   width: 40,
                   height: 2,
                   child: LinearProgressIndicator(
-                    backgroundColor: Colors.white10,
-                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.accentGold),
+                    backgroundColor: tc.textGhost,
+                    valueColor: AlwaysStoppedAnimation<Color>(tc.accent),
                   ),
                 ),
               ),

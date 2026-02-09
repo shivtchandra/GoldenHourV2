@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,6 +14,7 @@ import '../../data/models/pipeline_config.dart';
 import '../widgets/shutter_button.dart';
 import '../widgets/film_effect_overlay.dart';
 import '../widgets/camera_preview_widget.dart';
+import '../widgets/preset_carousel.dart';
 import 'dart:io';
 import 'camera_selector_screen.dart';
 import '../../../develop/presentation/screens/develop_screen.dart';
@@ -23,6 +25,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../presets/data/models/preset_model.dart';
+import '../../../presets/data/repositories/preset_repository.dart';
 import '../../providers/settings_provider.dart';
 import 'package:image/image.dart' as img;
 import 'package:flutter/foundation.dart';
@@ -44,20 +47,31 @@ class CameraScreen extends ConsumerStatefulWidget {
 
 class _CameraScreenState extends ConsumerState<CameraScreen> {
   bool _isProcessing = false;
-  final int _frameCount = 24;
+  int _frameCount = 0;
   final GlobalKey<CameraPreviewState> _cameraKey = GlobalKey();
-  
+
   // Camera state
   FlashMode _flashMode = FlashMode.off;
   late FixedExtentScrollController _rollController;
   late List<CameraModel> _allCameras;
   bool _isScrolling = false;
 
+  // Preset mode state
+  PresetModel? _selectedPreset;
+  bool _showGrid = true;
+
+  // Mode detection helpers
+  bool get isPresetMode => _selectedPreset != null;
+  bool get isCameraMode => _selectedPreset == null;
+
   @override
   void initState() {
     super.initState();
     _allCameras = CameraRepository.getAllCameras();
-    
+
+    // Initialize preset if provided
+    _selectedPreset = widget.initialPreset;
+
     // Initialize controller with current camera index
     final settings = ref.read(settingsProvider);
     final initialIndex = _allCameras.indexWhere((c) => c.id == settings.activeCameraId);
@@ -100,18 +114,14 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Camera Preview with Live Filter
+          // Camera Preview with Live Filter (respects aspect ratio)
           Positioned.fill(
-            child: ColorFiltered(
-              colorFilter: ColorFilter.matrix(selectedCamera.pipeline.toColorMatrix()),
-              child: CameraPreviewWidget(
-                key: _cameraKey,
-                onCameraReady: (controller) {},
-              ),
+            child: Center(
+              child: _buildFilteredCameraPreview(selectedCamera, aspectRatio),
             ),
           ),
 
-          // Film effect overlay (grain, date, etc)
+          // Film effect overlay (grain, vignette, etc)
           Positioned.fill(
             child: FilmEffectOverlay(
               camera: selectedCamera,
@@ -120,38 +130,97 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
             ),
           ),
 
+          // Rule of Thirds Grid
+          if (_showGrid)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: _buildGridOverlay(),
+              ),
+            ),
+
           // UI Layers
           SafeArea(
             child: Column(
               children: [
                 _buildRoyalHeader(theme, aspectRatio),
                 const Spacer(),
-                
-                // Horizontal Film Roll (Above Controls)
-                _buildHorizontalFilmRoll(theme),
-                
-                _buildRoyalControls(theme, selectedCamera, aspectRatio),
+
+                // Bottom UI Group (Fixed position relative to bottom)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Selector (Film Roll or Preset Carousel)
+                      _buildSelector(theme),
+                      const SizedBox(height: 8),
+                      _buildRoyalControls(theme, selectedCamera, aspectRatio),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
           
           if (_isProcessing)
             Positioned.fill(
-              child: Container(
-                color: Colors.black54,
-                child: Center(
-                  child: GlassContainer.clearGlass(
-                    width: 120,
-                    height: 120,
-                    borderRadius: BorderRadius.circular(20),
-                    borderColor: Colors.transparent, // Fix for assertion
+              child: FadeIn(
+                duration: const Duration(milliseconds: 300),
+                child: Container(
+                  color: Colors.black.withOpacity(0.85),
+                  child: Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const CircularProgressIndicator(color: AppColors.accentGold),
-                        const SizedBox(height: 16),
-                        Text('DEVELOPING...', 
-                          style: AppTypography.monoSmall.copyWith(color: AppColors.accentGold, letterSpacing: 2)),
+                        // Animated Lens Shutter Icon
+                        BounceInDown(
+                          duration: const Duration(milliseconds: 1000),
+                          child: Icon(
+                            isPresetMode ? Icons.auto_awesome_rounded : Icons.camera_rounded,
+                            color: AppColors.accentGold,
+                            size: 64,
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+                        // Processing Text
+                        FadeInUp(
+                          duration: const Duration(milliseconds: 800),
+                          delay: const Duration(milliseconds: 200),
+                          child: Text(
+                            'DEVELOPING FILM...',
+                            style: GoogleFonts.cinzel(
+                              color: AppColors.accentGold,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 4,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        // Subtext
+                        FadeInUp(
+                          duration: const Duration(milliseconds: 800),
+                          delay: const Duration(milliseconds: 400),
+                          child: Text(
+                            isPresetMode ? 'APPLYING PREMIUM PRESET' : 'PROCESSING PHOTOCK CHEMICALS',
+                            style: GoogleFonts.spaceMono(
+                              color: Colors.white38,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.5,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 48),
+                        // Progress line
+                        Container(
+                          width: 200,
+                          height: 2,
+                          child: const LinearProgressIndicator(
+                            backgroundColor: Colors.white10,
+                            color: AppColors.accentGold,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -163,47 +232,100 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
     );
   }
 
+  /// Build the camera preview with live filter applied
+  /// Uses selectedCamera from build() context for proper state reactivity
+  Widget _buildFilteredCameraPreview(CameraModel selectedCamera, String aspectRatio) {
+    // Determine which pipeline to use based on mode
+    final PipelineConfig pipeline;
+    if (isPresetMode && _selectedPreset != null) {
+      pipeline = _selectedPreset!.pipeline;
+    } else {
+      pipeline = selectedCamera.pipeline;
+    }
+
+    final colorMatrix = pipeline.toColorMatrix();
+
+    // Calculate target aspect ratio for preview crop
+    double? targetRatio;
+    if (aspectRatio == '4:5') targetRatio = 4 / 5;
+    else if (aspectRatio == '16:9') targetRatio = 16 / 9;
+    else if (aspectRatio == '1:1') targetRatio = 1.0;
+    else if (aspectRatio == '3:4') targetRatio = 3 / 4;
+
+    // Apply ColorFiltered with aspect ratio crop
+    Widget preview = ColorFiltered(
+      colorFilter: ColorFilter.matrix(colorMatrix),
+      child: CameraPreviewWidget(
+        key: _cameraKey,
+        onCameraReady: (controller) {},
+      ),
+    );
+
+    // If specific aspect ratio selected, crop preview to match output
+    if (targetRatio != null) {
+      preview = ClipRect(
+        child: AspectRatio(
+          aspectRatio: targetRatio,
+          child: preview,
+        ),
+      );
+    }
+
+    return preview;
+  }
+
   Widget _buildRoyalHeader(ThemeData theme, String aspectRatio) {
     final canPop = Navigator.canPop(context);
-    
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       child: FadeInDown(
         duration: const Duration(milliseconds: 800),
         child: Row(
           children: [
+            // Left button
             if (canPop)
               _glassIconButton(
                 icon: Icons.close_rounded,
                 onPressed: () => Navigator.pop(context),
               )
             else
-              const SizedBox(width: 44), // Maintain layout balance
-            
-            const Spacer(),
-            
-            // Minimal Centered Logo
-            Text(
-              'FILMCAM',
-              style: GoogleFonts.cinzel(
-                fontSize: 18,
-                letterSpacing: 8,
-                fontWeight: FontWeight.w900,
-                color: AppColors.accentGold,
+              const SizedBox(width: 40),
+
+            // Center title - use Expanded to prevent overflow
+            Expanded(
+              child: Text(
+                isPresetMode ? 'PRESETS' : 'CAMERA FILMS',
+                style: GoogleFonts.cinzel(
+                  fontSize: 13,
+                  letterSpacing: 3,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.accentGold.withOpacity(0.9),
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
 
-            const Spacer(),
-
+            // Right buttons - wrap in row with mainAxisSize.min
             Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 _glassIconButton(
-                  icon: _flashMode == FlashMode.off ? Icons.flash_off_rounded : 
+                  icon: _showGrid ? Icons.grid_on_rounded : Icons.grid_off_rounded,
+                  color: _showGrid ? AppColors.accentGold : Colors.white,
+                  onPressed: () {
+                    HapticFeedback.mediumImpact();
+                    setState(() => _showGrid = !_showGrid);
+                  },
+                ),
+                _glassIconButton(
+                  icon: _flashMode == FlashMode.off ? Icons.flash_off_rounded :
                         _flashMode == FlashMode.always ? Icons.flash_on_rounded : Icons.flash_auto_rounded,
                   color: _flashMode != FlashMode.off ? AppColors.accentGold : Colors.white,
                   onPressed: _toggleFlash,
                 ),
-                const SizedBox(width: 4),
                 _glassIconButton(
                   icon: Icons.aspect_ratio_rounded,
                   label: aspectRatio,
@@ -214,6 +336,12 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildGridOverlay() {
+    return CustomPaint(
+      painter: GridPainter(color: Colors.white.withOpacity(0.15)),
     );
   }
 
@@ -255,15 +383,40 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
     );
   }
 
+  /// Switch between camera film roll and preset carousel based on mode
+  Widget _buildSelector(ThemeData theme) {
+    if (isPresetMode) {
+      return _buildPresetSelector();
+    } else {
+      return _buildHorizontalFilmRoll(theme);
+    }
+  }
+
+  /// Build preset selector with mode indicator and carousel
+  Widget _buildPresetSelector() {
+    if (_selectedPreset == null) return const SizedBox();
+
+    return Column(
+      children: [
+        // Preset carousel
+        PresetCarousel(
+          selectedPreset: _selectedPreset!,
+          onPresetSelected: (preset) {
+            setState(() => _selectedPreset = preset);
+          },
+        ),
+      ],
+    );
+  }
+
   Widget _buildHorizontalFilmRoll(ThemeData theme) {
     return Container(
-      height: 100,
-      margin: const EdgeInsets.only(bottom: 10),
+      height: 110, // Sized to fit most screens
       child: RotatedBox(
         quarterTurns: -1,
         child: ListWheelScrollView.useDelegate(
           controller: _rollController,
-          itemExtent: 140, // Width in horizontal mode
+          itemExtent: 160, // Wider items for better spacing
           perspective: 0.003,
           diameterRatio: 1.8,
           physics: const FixedExtentScrollPhysics(),
@@ -283,58 +436,60 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
                 quarterTurns: 1,
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
-                  margin: const EdgeInsets.symmetric(vertical: 10),
+                  width: 160, // Fixed width to prevent overflow
                   child: Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // Animated Selection Indicator
+                        // Animated Selection Indicator (The Dash)
                         if (isSelected)
                           FadeInDown(
                             duration: const Duration(milliseconds: 400),
-                            from: 10,
+                            from: 5,
                             child: Container(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              height: 2,
+                              margin: const EdgeInsets.only(bottom: 6),
+                              height: 2.5,
                               width: 30,
                               decoration: BoxDecoration(
                                 color: AppColors.accentGold,
                                 borderRadius: BorderRadius.circular(1),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppColors.accentGold.withOpacity(0.5),
-                                    blurRadius: 10,
-                                  ),
-                                ],
                               ),
                             ),
                           ),
-                        
-                        // Focused Item Name
+
+                        // Focused Item Name - single line with ellipsis
                         Text(
                           camera.name.toUpperCase(),
                           style: GoogleFonts.cinzel(
                             color: isSelected ? Colors.white : Colors.white24,
-                            fontSize: isSelected ? 18 : 12,
-                            fontWeight: isSelected ? FontWeight.w900 : FontWeight.normal,
-                            letterSpacing: 4,
+                            fontSize: isSelected ? 16 : 11,
+                            fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
+                            letterSpacing: 1.5,
                           ),
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        
-                        const SizedBox(height: 4),
-                        
+
                         // Personality Tag
                         if (isSelected)
                           FadeInUp(
                             duration: const Duration(milliseconds: 400),
                             from: 5,
-                            child: Text(
-                              camera.personality.toUpperCase(),
-                              style: GoogleFonts.spaceMono(
-                                color: AppColors.accentGold,
-                                fontSize: 8,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 2,
+                            child: Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                camera.personality.toUpperCase(),
+                                style: GoogleFonts.spaceMono(
+                                  color: AppColors.accentGold.withOpacity(0.9),
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1.0,
+                                ),
+                                textAlign: TextAlign.center,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ),
@@ -352,22 +507,61 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
 
   Widget _buildRoyalControls(ThemeData theme, CameraModel selectedCamera, String aspectRatio) {
     return Container(
-      padding: const EdgeInsets.only(bottom: 40, top: 20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      height: 100, // Fixed height for absolute stability
+      child: Stack(
+        alignment: Alignment.center,
         children: [
-          _controlButton(
-            icon: Icons.photo_library_rounded,
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GalleryScreen())),
+          // Background Row for side buttons - Pushed to edges
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _controlButton(
+                  icon: Icons.photo_library_outlined,
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GalleryScreen())),
+                ),
+                _controlButton(
+                  icon: Icons.flip_camera_ios_outlined,
+                  onPressed: _switchCamera,
+                ),
+              ],
+            ),
           ),
-          
-          ShutterButton(
-            onPressed: () => _capturePhoto(selectedCamera, aspectRatio),
-            isProcessing: _isProcessing,
-          ),
-          _controlButton(
-            icon: Icons.flip_camera_ios_rounded,
-            onPressed: _switchCamera,
+
+          // Central Shutter Group - Absolutely Centered
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // This is the anchor. We show the sparkle button on the right 
+              // and a matching transparent spacer on the left to maintain 100% center
+              const SizedBox(width: 70), // Balance for the Preset button
+              
+              ShutterButton(
+                onPressed: () => _capturePhoto(selectedCamera, aspectRatio),
+                isProcessing: _isProcessing,
+              ),
+
+              // Mode Toggle (Sparkle or Camera Return)
+              SizedBox(
+                width: 70,
+                child: Center(
+                  child: _controlButton(
+                    icon: !isPresetMode ? Icons.auto_awesome_outlined : Icons.photo_camera_outlined,
+                    onPressed: () {
+                      if (!isPresetMode) {
+                        final allPresets = PresetRepository.getAllPresets();
+                        if (allPresets.isNotEmpty) {
+                          setState(() => _selectedPreset = allPresets.first);
+                        }
+                      } else {
+                        setState(() => _selectedPreset = null);
+                      }
+                    },
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -380,14 +574,15 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
         HapticFeedback.mediumImpact();
         onPressed();
       },
-      child: GlassContainer.clearGlass(
-        width: 60,
-        height: 60,
-        borderRadius: BorderRadius.circular(30),
-        borderWidth: 1,
-        borderColor: Colors.white10,
+      child: Container(
+        width: 50,
+        height: 50,
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.08),
+          shape: BoxShape.circle,
+        ),
         child: Center(
-          child: Icon(icon, color: Colors.white.withOpacity(0.8), size: 24),
+          child: Icon(icon, color: Colors.white, size: 22),
         ),
       ),
     );
@@ -461,7 +656,8 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
         final image = await state.captureImage();
         if (image != null) {
           if (mounted) {
-            final photoFile = File(image.path);
+            // CRITICAL: Resize image immediately to prevent memory issues on real devices
+            final photoFile = await _resizeImageIfNeeded(File(image.path));
             
             if (selectedCamera.pipeline.instantFilm) {
               // Navigate to Instant Development Screen
@@ -477,6 +673,43 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
               );
               setState(() => _isProcessing = false);
               HapticFeedback.vibrate();
+            } else if (ref.read(settingsProvider).autoSave) {
+              // Auto-Save background processing
+              final savedPath = await PhotoStorageService.instance.savePhoto(
+                sourcePath: photoFile.path,
+                cameraName: selectedCamera.name,
+                cameraId: selectedCamera.id,
+              );
+              
+              if (mounted) {
+                setState(() => _isProcessing = false);
+                if (savedPath != null) {
+                  HapticFeedback.mediumImpact();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      backgroundColor: Colors.black87,
+                      content: Row(
+                        children: [
+                          const Icon(Icons.check_circle_rounded, color: AppColors.accentGold, size: 20),
+                          const SizedBox(width: 12),
+                          Text(
+                            'SAVED TO GALLERY',
+                            style: GoogleFonts.spaceMono(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                        ],
+                      ),
+                      behavior: SnackBarBehavior.floating,
+                      margin: const EdgeInsets.all(20),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  );
+                }
+              }
             } else {
               setState(() => _isProcessing = false);
               _navigateToDevelop(selectedCamera, photoFile: photoFile);
@@ -504,11 +737,68 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
       MaterialPageRoute(
         builder: (context) => DevelopScreen(
           imageFile: photoFile,
-          initialCamera: selectedCamera,
+          initialCamera: isCameraMode ? selectedCamera : null,
+          initialPreset: isPresetMode ? _selectedPreset : null,
           initialAspectRatio: ref.read(settingsProvider).aspectRatio,
         ),
       ),
     );
+  }
+
+  /// Resize captured image to prevent memory issues on real devices
+  /// Real phones can capture 12-48MP images which exhaust memory during processing
+  Future<File> _resizeImageIfNeeded(File originalFile) async {
+    try {
+      final bytes = await originalFile.readAsBytes();
+      debugPrint('CameraScreen: Original image size: ${bytes.length} bytes');
+
+      // Decode and check size
+      final decoded = await compute(_decodeAndResize, bytes);
+      if (decoded == null) {
+        debugPrint('CameraScreen: Failed to decode, returning original');
+        return originalFile;
+      }
+
+      // Write resized image to a new temp file
+      final tempDir = originalFile.parent;
+      final resizedFile = File('${tempDir.path}/resized_${DateTime.now().millisecondsSinceEpoch}.jpg');
+      await resizedFile.writeAsBytes(decoded);
+
+      debugPrint('CameraScreen: Resized image size: ${decoded.length} bytes');
+      return resizedFile;
+    } catch (e) {
+      debugPrint('CameraScreen: Resize error: $e, returning original');
+      return originalFile;
+    }
+  }
+
+  /// Static method for compute isolate - decodes and resizes image
+  static Uint8List? _decodeAndResize(Uint8List bytes) {
+    try {
+      var decoded = img.decodeJpg(bytes);
+      if (decoded == null) {
+        decoded = img.decodeImage(bytes);
+      }
+      if (decoded == null) return null;
+
+      // Apply EXIF rotation
+      decoded = img.bakeOrientation(decoded);
+
+      // Resize if too large (max 1200px for processing safety)
+      const int maxDimension = 1200;
+      if (decoded.width > maxDimension || decoded.height > maxDimension) {
+        if (decoded.width > decoded.height) {
+          decoded = img.copyResize(decoded, width: maxDimension);
+        } else {
+          decoded = img.copyResize(decoded, height: maxDimension);
+        }
+      }
+
+      // Encode back to JPEG with good quality
+      return Uint8List.fromList(img.encodeJpg(decoded, quality: 92));
+    } catch (e) {
+      return null;
+    }
   }
 
   List<double> _getColorMatrix(PipelineConfig pipeline) {
@@ -606,4 +896,27 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
       pipeline: pipeline,
     );
   }
+}
+
+class GridPainter extends CustomPainter {
+  final Color color;
+  GridPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 0.5;
+
+    // Vertical lines
+    canvas.drawLine(Offset(size.width / 3, 0), Offset(size.width / 3, size.height), paint);
+    canvas.drawLine(Offset(2 * size.width / 3, 0), Offset(2 * size.width / 3, size.height), paint);
+
+    // Horizontal lines
+    canvas.drawLine(Offset(0, size.height / 3), Offset(size.width, size.height / 3), paint);
+    canvas.drawLine(Offset(0, 2 * size.height / 3), Offset(size.width, 2 * size.height / 3), paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

@@ -1,4 +1,4 @@
-package com.filmcam.film_cam
+package com.goldenhour.filmcam
 
 import io.flutter.embedding.android.FlutterActivity
 

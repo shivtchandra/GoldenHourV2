@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:glass_kit/glass_kit.dart';
 import 'package:animate_do/animate_do.dart';
 import '../../../../app/theme/colors.dart';
+import '../../../../app/theme/theme_colors.dart';
 import '../../../../app/theme/typography.dart';
 
 class StudioScreen extends StatelessWidget {
@@ -11,6 +12,7 @@ class StudioScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = context.colors;
     final body = Stack(
       children: [
         // Background Glow
@@ -22,11 +24,11 @@ class StudioScreen extends StatelessWidget {
             height: 300,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppColors.accentGold.withOpacity(0.05),
+              color: tc.accentSubtle,
             ),
           ),
         ),
-        
+
         SafeArea(
           bottom: !isEmbedded,
           child: Column(
@@ -41,7 +43,7 @@ class StudioScreen extends StatelessWidget {
                         child: Icon(
                           Icons.auto_awesome_rounded,
                           size: 80,
-                          color: AppColors.accentGold.withOpacity(0.2),
+                          color: tc.accentMuted,
                         ),
                       ),
                       const SizedBox(height: 24),
@@ -49,7 +51,7 @@ class StudioScreen extends StatelessWidget {
                         child: Text(
                           'ROYAL STUDIO',
                           style: AppTypography.displayMedium.copyWith(
-                            color: AppColors.accentGold,
+                            color: tc.accent,
                             letterSpacing: 8,
                           ),
                         ),
@@ -60,7 +62,7 @@ class StudioScreen extends StatelessWidget {
                         child: Text(
                           'AI-POWERED FILM ENHANCEMENT',
                           style: AppTypography.monoSmall.copyWith(
-                            color: Colors.white38,
+                            color: tc.textMuted,
                             letterSpacing: 2,
                           ),
                         ),
@@ -68,16 +70,16 @@ class StudioScreen extends StatelessWidget {
                       const SizedBox(height: 48),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 40),
-                        child: GlassContainer.clearGlass(
+                        child: AdaptiveGlass(
                           height: 60,
                           width: double.infinity,
                           borderRadius: BorderRadius.circular(30),
-                          borderColor: Colors.transparent, // Fix for assertion
+                          borderColor: Colors.transparent,
                           child: Center(
                             child: Text(
                               'IMPORT NEGATIVE',
                               style: AppTypography.labelLarge.copyWith(
-                                color: Colors.white,
+                                color: tc.textPrimary,
                                 letterSpacing: 4,
                               ),
                             ),
@@ -87,7 +89,7 @@ class StudioScreen extends StatelessWidget {
                       const SizedBox(height: 16),
                       Text(
                         'Coming Soon to Pro Members',
-                        style: AppTypography.bodySmall.copyWith(color: Colors.white24),
+                        style: AppTypography.bodySmall.copyWith(color: tc.textFaint),
                       ),
                     ],
                   ),
@@ -102,25 +104,25 @@ class StudioScreen extends StatelessWidget {
     if (isEmbedded) return body;
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: tc.scaffoldBackground,
       body: body,
     );
   }
 
   Widget _buildHeader(BuildContext context) {
-    if (isEmbedded) return const SizedBox(height: 60); // Space for top padding
+    if (isEmbedded) return const SizedBox(height: 60);
 
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Row(
         children: [
-          GlassContainer.clearGlass(
+          AdaptiveGlass(
             width: 48,
             height: 48,
             borderRadius: BorderRadius.circular(24),
-            borderColor: Colors.transparent, // Fix for assertion
+            borderColor: Colors.transparent,
             child: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+              icon: Icon(Icons.arrow_back_ios_new_rounded, color: context.colors.iconPrimary, size: 20),
               onPressed: () => Navigator.pop(context),
             ),
           ),

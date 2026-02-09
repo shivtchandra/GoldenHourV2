@@ -1,24 +1,41 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
 import '../../../camera/data/models/pipeline_config.dart';
 import '../models/preset_model.dart';
 
 /// Repository containing all 68+ editing presets
 class PresetRepository {
-  // Favorites tracking (in-memory, can be persisted later)
+  // Favorites tracking (persistent)
+  static SharedPreferences? _prefs;
   static final Set<String> _favorites = {};
+  static final _favoriteController = StreamController<void>.broadcast();
 
-  // =============================================
-  // HELPER METHODS
-  // =============================================
+  /// Initialize with SharedPreferences
+  static Future<void> init(SharedPreferences prefs) async {
+    _prefs = prefs;
+    final strings = _prefs?.getStringList('favorite_presets');
+    if (strings != null) {
+      _favorites.addAll(strings);
+    }
+  }
+
+  /// Stream of favorite changes
+  static Stream<void> get favoritesChanged => _favoriteController.stream;
 
   static bool isFavorite(String id) => _favorites.contains(id);
 
-  static void toggleFavorite(String id) {
+  static Future<void> toggleFavorite(String id) async {
     if (_favorites.contains(id)) {
       _favorites.remove(id);
     } else {
       _favorites.add(id);
     }
+
+    if (_prefs != null) {
+      await _prefs!.setStringList('favorite_presets', _favorites.toList());
+    }
+    _favoriteController.add(null);
   }
 
   static List<PresetModel> getFavoritePresets() {

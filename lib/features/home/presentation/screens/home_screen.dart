@@ -3,6 +3,7 @@ import 'package:flex_color_scheme/flex_color_scheme.dart';
 import 'package:flutter/material.dart';
 import 'package:glass_kit/glass_kit.dart';
 import '../../../../app/theme/colors.dart';
+import '../../../../app/theme/theme_colors.dart';
 import '../../../../app/theme/typography.dart';
 import '../../../camera/data/repositories/camera_repository.dart';
 import '../../../camera/data/models/camera_model.dart';
@@ -14,38 +15,60 @@ import '../../../camera/presentation/screens/camera_selector_screen.dart';
 import 'studio_screen.dart';
 import '../../../settings/presentation/screens/profile_screen.dart';
 import '../../../settings/presentation/screens/settings_screen.dart';
+import '../../../settings/providers/user_provider.dart';
 import '../../../presets/presentation/screens/presets_screen.dart';
 import '../../../develop/presentation/screens/develop_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../camera/providers/settings_provider.dart';
 import '../../../../core/services/photo_storage_service.dart';
+import '../widgets/feature_tutorial_overlay.dart';
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _currentIndex = 0;
   bool _isLoading = true;
   String? _error;
-  List<PhotoInfo> _recentPhotos = [];
+  bool _showTutorial = false;
 
   @override
   void initState() {
     super.initState();
     _initData();
+    _checkTutorial();
+  }
+
+  void _checkTutorial() async {
+    final shouldShow = await FeatureTutorialOverlay.shouldShow();
+    if (shouldShow && mounted) {
+      setState(() => _showTutorial = true);
+    }
+  }
+
+  int _getInitialIndexFromWorkflow(String workflow) {
+    switch (workflow) {
+      case 'camera_explorer':
+        return 1; // Lenses tab
+      case 'quick_presets':
+        return 2; // Presets tab
+      case 'balanced':
+      default:
+        return 0; // Home tab
+    }
   }
 
   void _initData() async {
     try {
-      // Removed local _selectedCamera initialization as it's now handled by Riverpod
+      // Always start on the Home Dashboard (index 0) regardless of workflow preference
+      setState(() {
+        _currentIndex = 0;
+      });
 
-      // Fetch recent photos
-      _recentPhotos = await PhotoStorageService.instance.getAllPhotos();
-      
       _isLoading = false;
     } catch (e) {
       _error = e.toString();
@@ -55,63 +78,84 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Listen for workflow preference changes
+    ref.listen<AppSettings>(settingsProvider, (previous, next) {
+      if (previous?.preferredWorkflow != next.preferredWorkflow) {
+        // Workflow changed - update current index
+        setState(() {
+          _currentIndex = _getInitialIndexFromWorkflow(next.preferredWorkflow);
+        });
+      }
+    });
+
+    final tc = context.colors;
+
     if (_error != null) {
       return Scaffold(
-        backgroundColor: Colors.black,
-        body: Center(child: Text("ERROR: $_error", style: const TextStyle(color: Colors.red))),
+        backgroundColor: tc.scaffoldBackground,
+        body: Center(child: Text("ERROR: $_error", style: TextStyle(color: tc.error))),
       );
     }
 
     if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: Colors.black,
-        body: Center(child: CircularProgressIndicator(color: AppColors.accentGold)),
+      return Scaffold(
+        backgroundColor: tc.scaffoldBackground,
+        body: Center(child: CircularProgressIndicator(color: tc.accent)),
       );
     }
 
     final theme = Theme.of(context);
+    final settings = ref.watch(settingsProvider);
+    final user = ref.watch(userProfileProvider);
+    final currentCamera = CameraRepository.getAllCameras().firstWhere(
+      (c) => c.id == settings.activeCameraId,
+      orElse: () => CameraRepository.getAllCameras().first,
+    );
 
-    return Consumer(
-      builder: (context, ref, child) {
-        final settings = ref.watch(settingsProvider);
-        final currentCamera = CameraRepository.getAllCameras().firstWhere(
-          (c) => c.id == settings.activeCameraId,
-          orElse: () => CameraRepository.getAllCameras().first,
-        );
-
-        return Scaffold(
-          backgroundColor: Colors.black,
-          body: Stack(
+    return Scaffold(
+      backgroundColor: tc.scaffoldBackground,
+      body: Stack(
+        children: [
+          _buildBackgroundGlows(theme),
+          IndexedStack(
+            index: _currentIndex,
             children: [
-              _buildBackgroundGlows(theme),
-              IndexedStack(
-                index: _currentIndex,
-                children: [
-                  _buildHomeContent(theme, currentCamera),
-                  CameraSelectorScreen(
-                    currentCamera: currentCamera,
-                    onCameraSelected: (camera) {
-                      ref.read(settingsProvider.notifier).setActiveCamera(camera.id);
-                      setState(() => _currentIndex = 0);
-                    },
-                  ),
-                  PresetsScreen(
-                    onPresetSelected: (preset) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => CameraScreen(initialPreset: preset),
-                        ),
-                      );
-                    },
-                  ),
-                ],
+              _buildHomeContent(theme, currentCamera, user),
+              CameraSelectorScreen(
+                currentCamera: currentCamera,
+                onCameraSelected: (camera) {
+                  ref.read(settingsProvider.notifier).setActiveCamera(camera.id);
+                  // Navigate directly to camera screen (like presets)
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const CameraScreen(),
+                    ),
+                  );
+                },
+              ),
+              PresetsScreen(
+                onPresetSelected: (preset) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => CameraScreen(initialPreset: preset),
+                    ),
+                  );
+                },
               ),
             ],
           ),
-          bottomNavigationBar: _buildRoyalDock(theme),
-        );
-      },
+          // Feature tutorial overlay (shown after first login)
+          if (_showTutorial)
+            FeatureTutorialOverlay(
+              onComplete: () {
+                setState(() => _showTutorial = false);
+              },
+            ),
+        ],
+      ),
+      bottomNavigationBar: _showTutorial ? null : _buildRoyalDock(theme),
     );
   }
 
@@ -146,17 +190,17 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildHomeContent(ThemeData theme, CameraModel currentCamera) {
+  Widget _buildHomeContent(ThemeData theme, CameraModel currentCamera, UserProfile user) {
     return SafeArea(
       child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildHeader(theme),
+            _buildHeader(theme, user),
             const SizedBox(height: 24),
             FadeInLeft(
               duration: const Duration(milliseconds: 800),
-              child: _buildGreeting(theme),
+              child: _buildGreeting(theme, user),
             ),
             const SizedBox(height: 40),
             FadeIn(
@@ -191,7 +235,16 @@ class _HomeScreenState extends State<HomeScreen> {
             FadeInUp(
               duration: const Duration(milliseconds: 1000),
               delay: const Duration(milliseconds: 700),
-              child: _buildRecentShotsList(theme, currentCamera),
+              child: Consumer(
+                builder: (context, ref, _) {
+                  final recentPhotosAsync = ref.watch(recentPhotosProvider);
+                  return recentPhotosAsync.when(
+                    data: (photos) => _buildRecentShotsList(theme, currentCamera, photos),
+                    loading: () => const Center(child: CircularProgressIndicator()),
+                    error: (err, _) => Center(child: Text('Error: $err')),
+                  );
+                },
+              ),
             ),
             const SizedBox(height: 100),
           ],
@@ -200,34 +253,41 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildHeader(ThemeData theme) {
+  Widget _buildHeader(ThemeData theme, UserProfile user) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           const SizedBox(width: 48), // Spacer to keep title centered
-          Text(
-            'FILMCAM',
-            style: AppTypography.displayMedium.copyWith(
-              fontSize: 24,
-              color: theme.colorScheme.primary,
-              letterSpacing: 4,
+          Expanded(
+            child: Center(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  'GOLDENHOUR',
+                  style: AppTypography.displayMedium.copyWith(
+                    fontSize: 20,
+                    color: theme.colorScheme.primary,
+                    letterSpacing: 2,
+                  ),
+                ),
+              ),
             ),
           ),
-          Container(
-            padding: const EdgeInsets.all(2),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: theme.colorScheme.primary.withOpacity(0.5), width: 1.5),
-            ),
-            child: GestureDetector(
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen())),
+          GestureDetector(
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen())),
+            child: Container(
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: theme.colorScheme.primary.withOpacity(0.5), width: 1.5),
+              ),
               child: CircleAvatar(
                 backgroundColor: theme.colorScheme.primaryContainer,
                 radius: 18,
                 child: Text(
-                  'S',
+                  user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
                   style: TextStyle(
                     color: theme.colorScheme.onPrimaryContainer,
                     fontWeight: FontWeight.bold,
@@ -242,11 +302,14 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildGreeting(ThemeData theme) {
+  Widget _buildGreeting(ThemeData theme, UserProfile user) {
     final hour = DateTime.now().hour;
     String greeting = 'GOOD MORNING';
     if (hour >= 12 && hour < 17) greeting = 'GOOD AFTERNOON';
     if (hour >= 17) greeting = 'GOOD EVENING';
+
+    final user = ref.watch(userProfileProvider);
+    final firstName = user.name.split(' ').first.toUpperCase();
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -254,9 +317,9 @@ class _HomeScreenState extends State<HomeScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            greeting,
+            '$greeting, $firstName',
             style: AppTypography.displaySmall.copyWith(
-              color: AppColors.accentGold.withOpacity(0.6),
+              color: context.colors.accentSecondary,
               fontSize: 14,
               letterSpacing: 4,
             ),
@@ -265,7 +328,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Text(
             'MASTERPIECES.',
             style: AppTypography.displayLarge.copyWith(
-              color: Colors.white,
+              color: context.colors.textPrimary,
               fontSize: 32,
               letterSpacing: 2,
             ),
@@ -282,7 +345,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            GlassContainer.clearGlass(
+            AdaptiveGlass(
               height: 520,
               width: double.infinity,
               borderRadius: BorderRadius.circular(32),
@@ -298,22 +361,21 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         Container(
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.2),
+                            color: context.colors.overlayDark,
                             shape: BoxShape.circle,
                           ),
                           child: IconButton(
-                            onPressed: () {
-                              setState(() {
-                                CameraRepository.toggleFavorite(currentCamera.id);
-                              });
+                            onPressed: () async {
+                              await CameraRepository.toggleFavorite(currentCamera.id);
+                              setState(() {});
                             },
                             icon: Icon(
-                              CameraRepository.isFavorite(currentCamera.id) 
-                                  ? Icons.favorite_rounded 
+                              CameraRepository.isFavorite(currentCamera.id)
+                                  ? Icons.favorite_rounded
                                   : Icons.favorite_border_rounded,
-                              color: CameraRepository.isFavorite(currentCamera.id) 
-                                  ? Colors.redAccent 
-                                  : Colors.white.withOpacity(0.6),
+                              color: CameraRepository.isFavorite(currentCamera.id)
+                                  ? context.colors.favorite
+                                  : context.colors.iconMuted,
                             ),
                           ),
                         ),
@@ -354,7 +416,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         size: 100,
                         color: currentCamera.iconColor.withOpacity(0.9),
                       ),
-                    ).shimmer(duration: const Duration(seconds: 3), color: Colors.white.withOpacity(0.3)),
+                    ).shimmer(duration: const Duration(seconds: 3), color: context.colors.shimmerHighlight),
                   ),
                   const Spacer(),
                   Text(
@@ -362,7 +424,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: AppTypography.displayMedium.copyWith(
                       fontSize: 28,
                       letterSpacing: 2,
-                      color: Colors.white,
+                      color: context.colors.textPrimary,
                       shadows: [
                         Shadow(color: Colors.black.withOpacity(0.5), blurRadius: 10),
                       ],
@@ -375,7 +437,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       'ISO ${currentCamera.iso} • ${currentCamera.description}',
                       textAlign: TextAlign.center,
                       style: AppTypography.bodySmall.copyWith(
-                        color: Colors.white.withOpacity(0.8),
+                        color: context.colors.textSecondary,
                         letterSpacing: 1.2,
                         height: 1.4,
                       ),
@@ -400,7 +462,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     _initData();
                   }
                 },
-                child: GlassContainer.clearGlass(
+                child: AdaptiveGlass(
                   width: 200,
                   height: 64,
                   borderRadius: BorderRadius.circular(32),
@@ -413,12 +475,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         Text(
                           'CAPTURE',
                           style: AppTypography.labelLarge.copyWith(
-                            color: AppColors.accentGold,
+                            color: context.colors.accent,
                             letterSpacing: 3,
                           ),
                         ),
                         const SizedBox(width: 12),
-                        const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.accentGold, size: 16),
+                        Icon(Icons.arrow_forward_ios_rounded, color: context.colors.accent, size: 16),
                       ],
                     ),
                   ),
@@ -433,6 +495,9 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
   Widget _buildQuickActions(ThemeData theme) {
+    final settings = ref.watch(settingsProvider);
+    final preferredWorkflow = settings.preferredWorkflow;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
@@ -441,7 +506,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Text(
             'QUICK ACCESS',
             style: AppTypography.monoSmall.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.5),
+              color: context.colors.textTertiary,
               letterSpacing: 2,
             ),
           ),
@@ -452,13 +517,13 @@ class _HomeScreenState extends State<HomeScreen> {
               _royalActionItem(theme, 'GALLERY', Icons.collections_outlined, () async {
                 await Navigator.push(context, MaterialPageRoute(builder: (_) => const GalleryScreen()));
                 _initData();
-              }),
+              }, emphasized: false),
               _royalActionItem(theme, 'LENSES', Icons.auto_awesome_motion_rounded, () {
                 setState(() => _currentIndex = 1);
-              }),
+              }, emphasized: preferredWorkflow == 'camera_explorer'),
               _royalActionItem(theme, 'PRESETS', Icons.auto_awesome_rounded, () {
                 setState(() => _currentIndex = 2);
-              }),
+              }, emphasized: preferredWorkflow == 'quick_presets'),
             ],
           ),
         ],
@@ -466,18 +531,25 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _royalActionItem(ThemeData theme, String label, IconData icon, VoidCallback onTap) {
+  Widget _royalActionItem(ThemeData theme, String label, IconData icon, VoidCallback onTap, {bool emphasized = false}) {
+    final tc = context.colors;
     return GestureDetector(
       onTap: onTap,
       child: Column(
         children: [
-          GlassContainer.clearGlass(
+          AdaptiveGlass(
             width: 80,
             height: 80,
             borderRadius: BorderRadius.circular(24),
-            borderWidth: 1,
-            borderColor: Colors.transparent,
-            child: Icon(icon, color: theme.colorScheme.primary, size: 32),
+            borderWidth: emphasized ? 2 : 1,
+            borderColor: emphasized
+              ? tc.borderAccent
+              : Colors.transparent,
+            child: Icon(
+              icon,
+              color: emphasized ? tc.accent : theme.colorScheme.primary,
+              size: emphasized ? 36 : 32,
+            ),
           ),
           const SizedBox(height: 12),
           Text(
@@ -485,7 +557,9 @@ class _HomeScreenState extends State<HomeScreen> {
             style: AppTypography.labelMedium.copyWith(
               fontSize: 10,
               letterSpacing: 2,
-              color: theme.colorScheme.onSurface.withOpacity(0.8),
+              color: emphasized
+                ? tc.accent
+                : tc.textSecondary,
             ),
           ),
         ],
@@ -501,7 +575,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Text(
         'FAVORITE CAMERAS',
         style: AppTypography.monoSmall.copyWith(
-          color: theme.colorScheme.onSurface.withOpacity(0.5),
+          color: context.colors.textTertiary,
           letterSpacing: 2,
         ),
       ),
@@ -511,10 +585,11 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildFavoritesList(ThemeData theme, CameraModel currentCamera) {
     final favorites = CameraRepository.getFavoriteCameras();
     
+    final tc = context.colors;
     if (favorites.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: GlassContainer.clearGlass(
+        child: AdaptiveGlass(
           height: 100,
           width: double.infinity,
           borderRadius: BorderRadius.circular(24),
@@ -523,11 +598,11 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.favorite_border_rounded, color: Colors.white.withOpacity(0.3), size: 32),
+              Icon(Icons.favorite_border_rounded, color: tc.textMuted, size: 32),
               const SizedBox(height: 8),
               Text(
                 'NO FAVORITES YET',
-                style: AppTypography.labelMedium.copyWith(color: Colors.white38, letterSpacing: 2),
+                style: AppTypography.labelMedium.copyWith(color: tc.textMuted, letterSpacing: 2),
               ),
             ],
           ),
@@ -549,12 +624,12 @@ class _HomeScreenState extends State<HomeScreen> {
             
             return GestureDetector(
               onTap: () => ref.read(settingsProvider.notifier).setActiveCamera(camera.id),
-              child: GlassContainer.clearGlass(
+              child: AdaptiveGlass(
                 width: 110,
                 height: 140,
                 borderRadius: BorderRadius.circular(24),
                 borderWidth: isSelected ? 2 : 1,
-                borderColor: isSelected ? AppColors.accentGold : Colors.transparent,
+                borderColor: isSelected ? tc.accent : Colors.transparent,
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -576,7 +651,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         overflow: TextOverflow.ellipsis,
                         style: AppTypography.labelMedium.copyWith(
                           fontSize: 10,
-                          color: Colors.white.withOpacity(0.9),
+                          color: tc.textPrimary,
                           height: 1.2,
                         ),
                       ),
@@ -623,11 +698,12 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildRecentShotsList(ThemeData theme, CameraModel currentCamera) {
-    if (_recentPhotos.isEmpty) {
+  Widget _buildRecentShotsList(ThemeData theme, CameraModel currentCamera, List<PhotoInfo> photos) {
+    final tc = context.colors;
+    if (photos.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: GlassContainer.clearGlass(
+        child: AdaptiveGlass(
           height: 160,
           width: double.infinity,
           borderRadius: BorderRadius.circular(24),
@@ -636,11 +712,11 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.photo_library_outlined, color: Colors.white.withOpacity(0.2), size: 40),
+              Icon(Icons.photo_library_outlined, color: tc.textFaint, size: 40),
               const SizedBox(height: 12),
               Text(
                 'NO CAPTURES YET',
-                style: AppTypography.labelMedium.copyWith(color: Colors.white24, letterSpacing: 2),
+                style: AppTypography.labelMedium.copyWith(color: tc.textFaint, letterSpacing: 2),
               ),
             ],
           ),
@@ -653,10 +729,10 @@ class _HomeScreenState extends State<HomeScreen> {
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(horizontal: 24),
         scrollDirection: Axis.horizontal,
-        itemCount: _recentPhotos.length,
+        itemCount: photos.length,
         separatorBuilder: (context, index) => const SizedBox(width: 16),
         itemBuilder: (context, index) {
-          final photo = _recentPhotos[index];
+          final photo = photos[index];
           
           return GestureDetector(
             onTap: () {
@@ -679,7 +755,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   photo.cameraId.replaceAll('_', ' ').toUpperCase(),
                   style: AppTypography.monoSmall.copyWith(
                     fontSize: 8,
-                    color: AppColors.accentGold.withOpacity(0.7),
+                    color: tc.accentMuted,
                     letterSpacing: 1,
                   ),
                 ),
@@ -687,7 +763,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   photo.formattedTime.toUpperCase(),
                   style: AppTypography.labelMedium.copyWith(
                     fontSize: 10,
-                    color: Colors.white54,
+                    color: tc.textTertiary,
                     letterSpacing: 1,
                   ),
                 ),
@@ -702,7 +778,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildRoyalDock(ThemeData theme) {
     return Padding(
       padding: const EdgeInsets.only(left: 24, right: 24, bottom: 32),
-      child: GlassContainer.clearGlass(
+      child: AdaptiveGlass(
         height: 80,
         width: double.infinity,
         borderRadius: BorderRadius.circular(40),
@@ -751,7 +827,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ) : null,
         child: Icon(
           icon,
-          color: (active && index < 3) ? theme.colorScheme.primary : Colors.white.withOpacity(0.4),
+          color: (active && index < 3) ? theme.colorScheme.primary : context.colors.iconFaint,
           size: 28,
         ),
       ).animate(target: (active && index < 3) ? 1 : 0)

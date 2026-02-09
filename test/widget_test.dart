@@ -4,10 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:film_cam/main.dart';
 
 void main() {
-  testWidgets('FilmCam app launches successfully', (WidgetTester tester) async {
-    await tester.pumpWidget(const ProviderScope(child: FilmCamApp()));
+  testWidgets('GoldenHour app launches successfully', (WidgetTester tester) async {
+    await tester.pumpWidget(const ProviderScope(child: GoldenHourApp()));
     
-    // Verify FILMCAM title is shown
-    expect(find.text('FILMCAM'), findsOneWidget);
+    // Verify title is shown
+    expect(find.text('GOLDENHOUR'), findsOneWidget);
   });
 }

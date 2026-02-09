@@ -17,6 +17,10 @@ class AppSettings {
   final String imageQuality;
   final String activeCameraId;
   final String aspectRatio;
+  final String preferredWorkflow;
+  final String themeMode;
+  final List<String> toolkitCameraIds;
+  final bool autoSave;
 
   const AppSettings({
     this.volumeShutter = false,
@@ -26,7 +30,11 @@ class AppSettings {
     this.effectOpacity = 0.6,
     this.imageQuality = 'High',
     this.activeCameraId = 'kodak_gold_200',
-    this.aspectRatio = '4:5',
+    this.aspectRatio = '3:4',
+    this.preferredWorkflow = 'balanced',
+    this.themeMode = 'dark',
+    this.toolkitCameraIds = const [],
+    this.autoSave = false,
   });
 
   AppSettings copyWith({
@@ -38,6 +46,10 @@ class AppSettings {
     String? imageQuality,
     String? activeCameraId,
     String? aspectRatio,
+    String? preferredWorkflow,
+    String? themeMode,
+    List<String>? toolkitCameraIds,
+    bool? autoSave,
   }) {
     return AppSettings(
       volumeShutter: volumeShutter ?? this.volumeShutter,
@@ -48,6 +60,10 @@ class AppSettings {
       imageQuality: imageQuality ?? this.imageQuality,
       activeCameraId: activeCameraId ?? this.activeCameraId,
       aspectRatio: aspectRatio ?? this.aspectRatio,
+      preferredWorkflow: preferredWorkflow ?? this.preferredWorkflow,
+      themeMode: themeMode ?? this.themeMode,
+      toolkitCameraIds: toolkitCameraIds ?? this.toolkitCameraIds,
+      autoSave: autoSave ?? this.autoSave,
     );
   }
 }
@@ -68,7 +84,11 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       effectOpacity: _prefs.getDouble('effectOpacity') ?? 0.6,
       imageQuality: _prefs.getString('imageQuality') ?? 'High',
       activeCameraId: _prefs.getString('activeCameraId') ?? 'kodak_gold_200',
-      aspectRatio: _prefs.getString('aspectRatio') ?? '4:5',
+      aspectRatio: _prefs.getString('aspectRatio') ?? '3:4',
+      preferredWorkflow: _prefs.getString('preferredWorkflow') ?? 'balanced',
+      themeMode: _prefs.getString('themeMode') ?? 'dark',
+      toolkitCameraIds: _prefs.getStringList('toolkitCameraIds') ?? [],
+      autoSave: _prefs.getBool('autoSave') ?? false,
     );
   }
 
@@ -81,6 +101,10 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     await _prefs.setString('imageQuality', state.imageQuality);
     await _prefs.setString('activeCameraId', state.activeCameraId);
     await _prefs.setString('aspectRatio', state.aspectRatio);
+    await _prefs.setString('preferredWorkflow', state.preferredWorkflow);
+    await _prefs.setString('themeMode', state.themeMode);
+    await _prefs.setStringList('toolkitCameraIds', state.toolkitCameraIds);
+    await _prefs.setBool('autoSave', state.autoSave);
   }
 
   void setVolumeShutter(bool value) {
@@ -120,6 +144,26 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
 
   void setAspectRatio(String ratio) {
     state = state.copyWith(aspectRatio: ratio);
+    _saveSettings();
+  }
+
+  void setPreferredWorkflow(String value) {
+    state = state.copyWith(preferredWorkflow: value);
+    _saveSettings();
+  }
+
+  void setThemeMode(String value) {
+    state = state.copyWith(themeMode: value);
+    _saveSettings();
+  }
+
+  void setToolkitCameras(List<String> ids) {
+    state = state.copyWith(toolkitCameraIds: ids);
+    _saveSettings();
+  }
+
+  void setAutoSave(bool value) {
+    state = state.copyWith(autoSave: value);
     _saveSettings();
   }
 }
