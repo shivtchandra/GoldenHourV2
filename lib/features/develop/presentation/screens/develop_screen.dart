@@ -53,6 +53,7 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
   bool _isProcessing = false;
   bool _isSaving = false;
   bool _showingOriginal = false;
+  bool _loadError = false; // True when image decode completely fails
   
   // Selection State
   PresetModel? _selectedPreset;
@@ -104,15 +105,20 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
 
   Future<void> _loadAndProcessImage() async {
     if (_currentFile == null) return;
-    setState(() => _isProcessing = true);
+    setState(() {
+      _isProcessing = true;
+      _loadError = false;
+    });
 
     try {
       final bytes = await _currentFile!.readAsBytes();
+      debugPrint('DevelopScreen: Read ${bytes.length} bytes from file');
 
       // Primary decode path in isolate for performance.
       // Fallback to platform codec when needed for device-specific formats.
       img.Image? decoded = await compute(_decodeAndResizeTask, bytes);
       if (decoded == null || _isLikelyInvalidDecode(decoded)) {
+        debugPrint('DevelopScreen: Primary decode failed or invalid, trying platform fallback');
         final platformDecoded = await _decodeAndResizeWithPlatform(bytes);
         if (platformDecoded != null) {
           decoded = platformDecoded;
@@ -121,6 +127,7 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
 
       if (decoded != null) {
         _originalImage = decoded;
+        debugPrint('DevelopScreen: Successfully decoded image: ${decoded.width}x${decoded.height}');
 
         // We no longer pre-compute capturePreview because we'll use Image.file 
         // for the "Original" view, which is much more stable and handled natively.
@@ -128,10 +135,30 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
 
         await _updatePreview();
       } else {
-        debugPrint('DevelopScreen: Could not decode selected image bytes.');
+        // Both decode paths failed - mark error but keep file for Image.file fallback
+        debugPrint('DevelopScreen: Both decode paths failed - using Image.file fallback');
+        if (mounted) {
+          setState(() => _loadError = true);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Could not process photo - showing original'),
+              backgroundColor: Colors.orange.shade700,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
       }
     } catch (e) {
       debugPrint('DevelopScreen: Error loading image: $e');
+      if (mounted) {
+        setState(() => _loadError = true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading photo: $e'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
@@ -453,11 +480,32 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
     final tc = context.colors;
 
     Widget buildSafeFileImage() {
-      if (_currentFile == null) return _buildImageError(tc, 'NO IMAGE FILE');
+      if (_currentFile == null) {
+        debugPrint('DevelopScreen: buildSafeFileImage - _currentFile is null');
+        return _buildImageError(tc, 'NO IMAGE FILE');
+      }
+      
+      // Check if file actually exists
+      if (!_currentFile!.existsSync()) {
+        debugPrint('DevelopScreen: buildSafeFileImage - file does not exist: ${_currentFile!.path}');
+        // Try to show displayBytes if available
+        if (_displayBytes != null) {
+          return Image.memory(
+            _displayBytes!,
+            fit: fit,
+            gaplessPlayback: true,
+            errorBuilder: (_, __, ___) => _buildImageError(tc, 'FILE DELETED'),
+          );
+        }
+        return _buildImageError(tc, 'FILE NOT FOUND');
+      }
+      
+      debugPrint('DevelopScreen: buildSafeFileImage - showing file: ${_currentFile!.path}');
       return Image.file(
         _currentFile!,
         fit: fit,
         errorBuilder: (context, error, stackTrace) {
+          debugPrint('DevelopScreen: Image.file errorBuilder triggered: $error');
           if (_displayBytes != null) {
             return Image.memory(
               _displayBytes!,
@@ -470,6 +518,7 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
         },
       );
     }
+
 
     // Determine the primary widget to show
     Widget imageWidget;

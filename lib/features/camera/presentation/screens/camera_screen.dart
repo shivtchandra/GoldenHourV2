@@ -659,8 +659,13 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
             // CRITICAL: Resize image immediately to prevent memory issues on real devices
             final photoFile = await _resizeImageIfNeeded(File(image.path));
             
-            if (selectedCamera.pipeline.instantFilm) {
-              // Navigate to Instant Development Screen
+            // When in preset mode, always go to DevelopScreen with the preset applied
+            // (presets don't use instant film mode)
+            if (isPresetMode) {
+              setState(() => _isProcessing = false);
+              _navigateToDevelop(selectedCamera, photoFile: photoFile);
+            } else if (selectedCamera.pipeline.instantFilm) {
+              // Navigate to Instant Development Screen for instant film cameras
               Navigator.push(
                 context,
                 MaterialPageRoute(
