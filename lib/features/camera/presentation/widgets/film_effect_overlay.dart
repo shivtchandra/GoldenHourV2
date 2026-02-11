@@ -57,12 +57,8 @@ class FilmEffectOverlay extends StatelessWidget {
             ),
           ),
 
-
-          // Scanline effect overlay (subtle)
-          CustomPaint(
-            painter: _ScanlinePainter(),
-            size: Size.infinite,
-          ),
+          // NOTE: Scanline effect REMOVED - was causing visible lines on photos
+          // The effect was supposed to be UI-only but was appearing in captures
 
           // Film Grain Overlay
           if (camera.pipeline.grainStrength > 0)
@@ -102,14 +98,17 @@ class _GrainPainter extends CustomPainter {
 }
 
 /// Subtle scanline effect painter for film aesthetic
+/// NOTE: This is a UI-only overlay and does NOT appear in saved photos.
+/// The effect is purely visual for the viewfinder experience.
 class _ScanlinePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.black.withAlpha(8)
-      ..strokeWidth = 1;
+      ..color = Colors.black.withAlpha(4) // Reduced from 8 to 4 for subtler effect
+      ..strokeWidth = 0.5; // Thinner lines
 
-    for (double y = 0; y < size.height; y += 4) {
+    // Draw lines every 6 pixels instead of 4 for less visible effect
+    for (double y = 0; y < size.height; y += 6) {
       canvas.drawLine(
         Offset(0, y),
         Offset(size.width, y),

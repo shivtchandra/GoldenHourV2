@@ -247,11 +247,14 @@ class _GalleryScreenState extends State<GalleryScreen> {
   }
 
   void _openPhotoViewer(PhotoInfo photo) {
+    // Find the index of the photo in the list
+    final index = _photos.indexWhere((p) => p.path == photo.path);
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => _FullScreenViewer(
-          photo: photo,
+          photos: _photos,
+          initialIndex: index >= 0 ? index : 0,
           onDelete: _loadPhotos,
         ),
       ),
@@ -303,18 +306,45 @@ class _GalleryScreenState extends State<GalleryScreen> {
   }
 }
 
-class _FullScreenViewer extends StatelessWidget {
-  final PhotoInfo photo;
+class _FullScreenViewer extends StatefulWidget {
+  final List<PhotoInfo> photos;
+  final int initialIndex;
   final VoidCallback onDelete;
 
-  const _FullScreenViewer({required this.photo, required this.onDelete});
+  const _FullScreenViewer({
+    required this.photos,
+    required this.initialIndex,
+    required this.onDelete,
+  });
+
+  @override
+  State<_FullScreenViewer> createState() => _FullScreenViewerState();
+}
+
+class _FullScreenViewerState extends State<_FullScreenViewer> {
+  late PageController _pageController;
+  late int _currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  PhotoInfo get _currentPhoto => widget.photos[_currentIndex];
 
   @override
   Widget build(BuildContext context) {
     // Full screen photo viewer stays dark - industry standard
-    final camera = CameraRepository.getCameraById(photo.cameraId);
-    final preset = PresetRepository.getPresetById(photo.cameraId);
-    final file = File(photo.path);
+    final camera = CameraRepository.getCameraById(_currentPhoto.cameraId);
+    final preset = PresetRepository.getPresetById(_currentPhoto.cameraId);
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -332,13 +362,23 @@ class _FullScreenViewer extends StatelessWidget {
               style: AppTypography.labelLarge.copyWith(color: Colors.white, fontSize: 14, letterSpacing: 2),
             ),
             Text(
-              photo.formattedTime,
+              _currentPhoto.formattedTime,
               style: AppTypography.monoSmall.copyWith(color: Colors.white54),
             ),
           ],
         ),
         centerTitle: true,
         actions: [
+          // Page indicator
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Text(
+                '${_currentIndex + 1}/${widget.photos.length}',
+                style: AppTypography.monoSmall.copyWith(color: Colors.white54),
+              ),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
             onPressed: () async {
@@ -360,20 +400,38 @@ class _FullScreenViewer extends StatelessWidget {
                 ),
               );
               if (confirmed == true) {
-                await PhotoStorageService.instance.deletePhoto(photo.path);
-                onDelete();
+                await PhotoStorageService.instance.deletePhoto(_currentPhoto.path);
+                widget.onDelete();
                 Navigator.pop(context);
               }
             },
           ),
         ],
       ),
-      body: Center(
-        child: InteractiveViewer(
-          child: file.existsSync()
-              ? Image.file(file, fit: BoxFit.contain)
-              : const Icon(Icons.broken_image, color: Colors.white10, size: 100),
-        ),
+      body: PageView.builder(
+        controller: _pageController,
+        itemCount: widget.photos.length,
+        onPageChanged: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+        itemBuilder: (context, index) {
+          final photo = widget.photos[index];
+          final file = File(photo.path);
+          return Center(
+            // InteractiveViewer with panEnabled: false allows PageView swipe to work
+            // User can still pinch-to-zoom, but horizontal swipe goes to PageView
+            child: InteractiveViewer(
+              panEnabled: false, // Disable pan so PageView can handle swipe
+              minScale: 1.0,
+              maxScale: 4.0,
+              child: file.existsSync()
+                  ? Image.file(file, fit: BoxFit.contain)
+                  : const Icon(Icons.broken_image, color: Colors.white10, size: 100),
+            ),
+          );
+        },
       ),
     );
   }

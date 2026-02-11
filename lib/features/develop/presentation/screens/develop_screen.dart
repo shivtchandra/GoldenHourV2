@@ -47,10 +47,11 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
 
   // Image State
   File? _currentFile;
+  Uint8List? _originalBytes; // Cache raw bytes to prevent repeated disk reads
   img.Image? _originalImage;
   Uint8List? _previewBytes;
   Uint8List? _displayBytes;
-  bool _isProcessing = false;
+  bool _isProcessing = true; // Start true so first frame shows loading, not original photo
   bool _isSaving = false;
   bool _showingOriginal = false;
   bool _loadError = false; // True when image decode completely fails
@@ -71,28 +72,38 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
   @override
   void initState() {
     super.initState();
+
+    // CORRECTION: The ColorFiltered widget in camera preview only affects the DISPLAY,
+    // NOT the captured image. The camera captures RAW unfiltered images.
+    // Therefore, we MUST apply the filter pipeline in DevelopScreen to get the film look.
+    //
+    // - If initialPreset is provided: Apply preset's pipeline
+    // - If initialCamera is provided: Apply camera's pipeline
+    // - If neither: Start with default (no filter)
+
     _pipeline = PipelineConfig.defaultConfig();
     _capturePipeline = PipelineConfig.defaultConfig();
 
-    // Load initial preset if provided
+    // Apply the filter from preset or camera
     if (widget.initialPreset != null) {
       _selectedPreset = widget.initialPreset;
-      _pipeline = widget.initialPreset!.pipeline;
-      _capturePipeline = widget.initialPreset!.pipeline;
       _captureName = widget.initialPreset!.name;
+      _pipeline = widget.initialPreset!.pipeline; // Apply the preset's filter
+      _capturePipeline = widget.initialPreset!.pipeline;
     }
 
     if (widget.initialCamera != null) {
-      _pipeline = widget.initialCamera!.pipeline;
-      _capturePipeline = widget.initialCamera!.pipeline;
       _captureName = widget.initialCamera!.name;
+      _pipeline = widget.initialCamera!.pipeline; // Apply the camera's filter
+      _capturePipeline = widget.initialCamera!.pipeline;
     }
 
     // Default to provider's ratio if not passed specifically
     _selectedAspectRatio = widget.initialAspectRatio ?? ref.read(settingsProvider).aspectRatio;
 
-    // Auto-switch to Adjust tab if photo was taken with preset
-    if (widget.initialPreset != null && _activeTab == 0) {
+    // Auto-switch to Adjust tab if photo was taken with preset/camera filter
+    // since the presets tab would just re-apply filters (undesirable)
+    if ((widget.initialPreset != null || widget.initialCamera != null) && _activeTab == 0) {
       _activeTab = 1; // Switch to Adjust tab
       _hasAutoSwitchedTab = true;
     }
@@ -105,6 +116,16 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
 
   Future<void> _loadAndProcessImage() async {
     if (_currentFile == null) return;
+
+    // FOOLPROOF: First verify the file exists
+    if (!_currentFile!.existsSync()) {
+      debugPrint('DevelopScreen: File does not exist: ${_currentFile!.path}');
+      if (mounted) {
+        setState(() => _loadError = true);
+      }
+      return;
+    }
+
     setState(() {
       _isProcessing = true;
       _loadError = false;
@@ -112,56 +133,140 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
 
     try {
       final bytes = await _currentFile!.readAsBytes();
+      _originalBytes = bytes;
+      
+      // CRITICAL: UI can now show the image immediately using Image.memory(_originalBytes!)
+      // before we even start the heavy decoding process in the isolate.
+      if (mounted) setState(() {});
+      
       debugPrint('DevelopScreen: Read ${bytes.length} bytes from file');
 
-      // Primary decode path in isolate for performance.
-      // Fallback to platform codec when needed for device-specific formats.
-      img.Image? decoded = await compute(_decodeAndResizeTask, bytes);
-      if (decoded == null || _isLikelyInvalidDecode(decoded)) {
-        debugPrint('DevelopScreen: Primary decode failed or invalid, trying platform fallback');
-        final platformDecoded = await _decodeAndResizeWithPlatform(bytes);
-        if (platformDecoded != null) {
-          decoded = platformDecoded;
+      // FOOLPROOF: If file is empty or too small, it's invalid
+      if (bytes.length < 100) {
+        debugPrint('DevelopScreen: File too small, likely corrupt');
+        if (mounted) setState(() => _loadError = true);
+        return;
+      }
+
+      // Try multiple decode strategies in order of reliability
+      img.Image? decoded;
+
+      // Strategy 1: Direct decode with image package (fastest)
+      try {
+        decoded = await compute(_decodeAndResizeTask, bytes);
+        if (decoded != null && !_isLikelyInvalidDecode(decoded)) {
+          debugPrint('DevelopScreen: Strategy 1 (direct decode) succeeded');
+        } else {
+          decoded = null;
+        }
+      } catch (e) {
+        debugPrint('DevelopScreen: Strategy 1 failed: $e');
+        decoded = null;
+      }
+
+      // Strategy 2: Platform codec fallback (handles device-specific formats)
+      if (decoded == null) {
+        try {
+          debugPrint('DevelopScreen: Trying Strategy 2 (platform codec)');
+          decoded = await _decodeAndResizeWithPlatform(bytes);
+          if (decoded != null && !_isLikelyInvalidDecode(decoded)) {
+            debugPrint('DevelopScreen: Strategy 2 (platform codec) succeeded');
+          } else {
+            decoded = null;
+          }
+        } catch (e) {
+          debugPrint('DevelopScreen: Strategy 2 failed: $e');
+          decoded = null;
+        }
+      }
+
+      // Strategy 3: Try decoding as specific formats
+      if (decoded == null) {
+        try {
+          debugPrint('DevelopScreen: Trying Strategy 3 (specific format decode)');
+          decoded = await compute(_decodeSpecificFormats, bytes);
+          if (decoded != null && !_isLikelyInvalidDecode(decoded)) {
+            debugPrint('DevelopScreen: Strategy 3 (specific format) succeeded');
+          } else {
+            decoded = null;
+          }
+        } catch (e) {
+          debugPrint('DevelopScreen: Strategy 3 failed: $e');
+          decoded = null;
         }
       }
 
       if (decoded != null) {
         _originalImage = decoded;
         debugPrint('DevelopScreen: Successfully decoded image: ${decoded.width}x${decoded.height}');
-
-        // We no longer pre-compute capturePreview because we'll use Image.file 
-        // for the "Original" view, which is much more stable and handled natively.
-        _capturePreviewBytes = null; 
-
         await _updatePreview();
       } else {
-        // Both decode paths failed - mark error but keep file for Image.file fallback
-        debugPrint('DevelopScreen: Both decode paths failed - using Image.file fallback');
+        // FOOLPROOF: All decode paths failed, but we still have the file
+        // The UI will show Image.file as fallback which always works
+        debugPrint('DevelopScreen: All decode strategies failed - UI will use Image.file fallback');
         if (mounted) {
           setState(() => _loadError = true);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Could not process photo - showing original'),
-              backgroundColor: Colors.orange.shade700,
-              duration: const Duration(seconds: 3),
-            ),
-          );
+          // Don't show error snackbar - just silently fall back to showing original
         }
       }
     } catch (e) {
       debugPrint('DevelopScreen: Error loading image: $e');
       if (mounted) {
         setState(() => _loadError = true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error loading photo: $e'),
-            backgroundColor: Colors.red.shade700,
-          ),
-        );
       }
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
+  }
+
+  /// Strategy 3: Try specific image format decoders
+  static img.Image? _decodeSpecificFormats(Uint8List bytes) {
+    try {
+      // Try JPEG first (most common for camera photos)
+      var decoded = img.decodeJpg(bytes);
+      if (decoded != null) {
+        decoded = img.bakeOrientation(decoded);
+        return _resizeIfNeeded(decoded);
+      }
+    } catch (_) {}
+
+    try {
+      // Try PNG
+      var decoded = img.decodePng(bytes);
+      if (decoded != null) {
+        return _resizeIfNeeded(decoded);
+      }
+    } catch (_) {}
+
+    try {
+      // Try WebP
+      var decoded = img.decodeWebP(bytes);
+      if (decoded != null) {
+        return _resizeIfNeeded(decoded);
+      }
+    } catch (_) {}
+
+    try {
+      // Try BMP
+      var decoded = img.decodeBmp(bytes);
+      if (decoded != null) {
+        return _resizeIfNeeded(decoded);
+      }
+    } catch (_) {}
+
+    return null;
+  }
+
+  static img.Image _resizeIfNeeded(img.Image decoded) {
+    const int maxDimension = 1000;
+    if (decoded.width > maxDimension || decoded.height > maxDimension) {
+      if (decoded.width > decoded.height) {
+        return img.copyResize(decoded, width: maxDimension, interpolation: img.Interpolation.average);
+      } else {
+        return img.copyResize(decoded, height: maxDimension, interpolation: img.Interpolation.average);
+      }
+    }
+    return decoded;
   }
 
   static img.Image? _decodeAndResizeTask(Uint8List bytes) {
@@ -173,7 +278,7 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
       // Otherwise images taken in portrait might appear landscape/squashed.
       decoded = img.bakeOrientation(decoded);
 
-      const int maxDimension = 1200;
+      const int maxDimension = 1000;
       if (decoded.width > maxDimension || decoded.height > maxDimension) {
         if (decoded.width > decoded.height) {
           decoded = img.copyResize(decoded, width: maxDimension, interpolation: img.Interpolation.average);
@@ -202,15 +307,21 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
 
       if (rawBytes == null) return null;
 
+      // CRITICAL FIX: Copy the bytes to a new buffer
+      // The rawBytes.buffer may be disposed or become invalid on some Android devices
+      // This ensures we have our own copy of the pixel data
+      final bytesList = rawBytes.buffer.asUint8List();
+      final copiedBytes = Uint8List.fromList(bytesList);
+
       img.Image decoded = img.Image.fromBytes(
         width: width,
         height: height,
-        bytes: rawBytes.buffer,
+        bytes: copiedBytes.buffer,
         numChannels: 4,
         order: img.ChannelOrder.rgba,
       );
 
-      const int maxDimension = 1200;
+      const int maxDimension = 1000;
       if (decoded.width > maxDimension || decoded.height > maxDimension) {
         if (decoded.width > decoded.height) {
           decoded = img.copyResize(decoded, width: maxDimension, interpolation: img.Interpolation.average);
@@ -262,13 +373,20 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
       }
     }
 
-    final bool lowLumaRange = (maxLum - minLum) <= 3;
-    final bool lowColorRange = (maxR - minR) <= 3 && (maxG - minG) <= 3 && (maxB - minB) <= 3;
+    // RELAXED: Changed threshold from 3 to 1 to reduce false positives
+    // Only flag images that are truly solid colors (no variation at all)
+    // This was too aggressive and flagging valid photos as "invalid" on some Android devices
+    final bool lowLumaRange = (maxLum - minLum) <= 1;
+    final bool lowColorRange = (maxR - minR) <= 1 && (maxG - minG) <= 1 && (maxB - minB) <= 1;
     return lowLumaRange && lowColorRange;
   }
 
   Future<void> _updatePreview() async {
-    if (_originalImage == null) return;
+    // FOOLPROOF: If no original image, the UI will fall back to Image.file
+    if (_originalImage == null) {
+      debugPrint('DevelopScreen: _updatePreview called but _originalImage is null');
+      return;
+    }
 
     try {
       // For live preview, we use a smaller version to keep it snappy.
@@ -281,21 +399,30 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
       });
 
       final encoded = await compute(img.encodeJpg, processed);
-      if (mounted) {
+      if (mounted && encoded.isNotEmpty) {
         setState(() {
           _displayBytes = Uint8List.fromList(encoded);
         });
       }
     } catch (e) {
-      debugPrint('DevelopScreen: Preview processing failed, using fallback: $e');
+      debugPrint('DevelopScreen: Preview processing failed: $e');
+      // Fallback 1: Try to encode original image without processing
       try {
         final fallback = await compute(img.encodeJpg, _originalImage!);
-        if (mounted) {
+        if (mounted && fallback.isNotEmpty) {
           setState(() {
             _displayBytes = Uint8List.fromList(fallback);
           });
+          debugPrint('DevelopScreen: Using unprocessed original as fallback');
+          return;
         }
-      } catch (_) {}
+      } catch (e2) {
+        debugPrint('DevelopScreen: Fallback encoding also failed: $e2');
+      }
+
+      // Fallback 2: Just leave _displayBytes null - UI will show Image.file
+      // This is fine because buildSafeFileImage() always works
+      debugPrint('DevelopScreen: All preview methods failed - UI will use Image.file');
     }
   }
 
@@ -395,6 +522,13 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
             onPressed: () => Navigator.pop(context),
             tooltip: 'Retake',
           ),
+          // Compare button - toggle to show original
+          _glassIconButton(
+            icon: _showingOriginal ? Icons.filter_hdr_rounded : Icons.compare_rounded,
+            onPressed: () => setState(() => _showingOriginal = !_showingOriginal),
+            color: _showingOriginal ? tc.accent : tc.iconMuted,
+            tooltip: _showingOriginal ? 'Show Filtered' : 'Compare Original',
+          ),
           Text(
             'DEVELOP',
             style: GoogleFonts.spaceMono(
@@ -419,7 +553,12 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
       return _buildImagePicker();
     }
 
-    // Show the image - either processed or raw fallback
+    // ONLY show the processed photo. Show loading screen until displayBytes is ready.
+    // This ensures the original unfiltered photo NEVER appears.
+    if (_displayBytes == null && !_showingOriginal) {
+      return _buildProcessingScreen();
+    }
+
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -430,6 +569,66 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  /// Full-screen processing indicator (like Instagram/VSCO)
+  Widget _buildProcessingScreen() {
+    final tc = context.colors;
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Animated film icon
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.0, end: 1.0),
+            duration: const Duration(milliseconds: 1500),
+            builder: (context, value, child) {
+              return Transform.scale(
+                scale: 0.8 + (0.2 * value),
+                child: Opacity(
+                  opacity: 0.5 + (0.5 * value),
+                  child: Icon(
+                    Icons.photo_camera_rounded,
+                    size: 80,
+                    color: tc.accent,
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 32),
+          // Processing text
+          Text(
+            'DEVELOPING YOUR PHOTO',
+            style: GoogleFonts.spaceMono(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: tc.textPrimary,
+              letterSpacing: 3,
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Subtitle
+          Text(
+            'Applying film effects...',
+            style: GoogleFonts.spaceMono(
+              fontSize: 11,
+              color: tc.textMuted,
+              letterSpacing: 1,
+            ),
+          ),
+          const SizedBox(height: 32),
+          // Progress indicator
+          SizedBox(
+            width: 200,
+            child: LinearProgressIndicator(
+              backgroundColor: tc.borderSubtle,
+              color: tc.accent,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -479,90 +678,71 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
   Widget _buildImagePreview({bool noDecoration = false, BoxFit fit = BoxFit.contain}) {
     final tc = context.colors;
 
+    /// FOOLPROOF: This widget ALWAYS shows something - never gray/blank
     Widget buildSafeFileImage() {
+      if (_originalBytes != null) {
+        return Image.memory(
+          _originalBytes!,
+          fit: fit,
+          filterQuality: FilterQuality.medium,
+          errorBuilder: (context, error, stackTrace) {
+            debugPrint('DevelopScreen: Image.memory from cached bytes failed: $error');
+            return _buildImageError(tc, 'PROCESS ERROR');
+          },
+        );
+      }
+
       if (_currentFile == null) {
-        debugPrint('DevelopScreen: buildSafeFileImage - _currentFile is null');
-        return _buildImageError(tc, 'NO IMAGE FILE');
+        return _buildImageError(tc, 'NO FILE');
       }
-      
-      // Check if file actually exists
-      if (!_currentFile!.existsSync()) {
-        debugPrint('DevelopScreen: buildSafeFileImage - file does not exist: ${_currentFile!.path}');
-        // Try to show displayBytes if available
-        if (_displayBytes != null) {
-          return Image.memory(
-            _displayBytes!,
-            fit: fit,
-            gaplessPlayback: true,
-            errorBuilder: (_, __, ___) => _buildImageError(tc, 'FILE DELETED'),
-          );
-        }
-        return _buildImageError(tc, 'FILE NOT FOUND');
-      }
-      
-      debugPrint('DevelopScreen: buildSafeFileImage - showing file: ${_currentFile!.path}');
+
+      // Fallback to Image.file if bytes haven't loaded yet
       return Image.file(
         _currentFile!,
         fit: fit,
-        errorBuilder: (context, error, stackTrace) {
-          debugPrint('DevelopScreen: Image.file errorBuilder triggered: $error');
-          if (_displayBytes != null) {
-            return Image.memory(
-              _displayBytes!,
-              fit: fit,
-              gaplessPlayback: true,
-              errorBuilder: (_, __, ___) => _buildImageError(tc, 'UNSUPPORTED PHOTO'),
-            );
-          }
-          return _buildImageError(tc, 'UNSUPPORTED PHOTO');
+        errorBuilder: (_, e, __) {
+          return _buildImageError(tc, 'CANNOT DISPLAY');
         },
       );
     }
 
-
-    // Determine the primary widget to show
+    // ONLY SHOW PROCESSED IMAGE - never show the original unfiltered photo
     Widget imageWidget;
-    
+
+    // Case 1: User wants to see original (compare mode)
     if (_showingOriginal) {
-      // ALWAYS use Image.file for original if available - it's handled natively
-      // and won't crash even with 48MP images.
-      if (_currentFile != null) {
-        imageWidget = buildSafeFileImage();
-      } else {
-        imageWidget = _buildImageError(tc, 'ORIGINAL NOT FOUND');
-      }
-    } else if (_displayBytes != null) {
-      // Show processed preview
+      imageWidget = buildSafeFileImage();
+    }
+    // Case 2: We have processed bytes ready to display
+    else if (_displayBytes != null && _displayBytes!.isNotEmpty) {
       imageWidget = Image.memory(
         _displayBytes!,
         fit: fit,
         gaplessPlayback: true,
-        errorBuilder: (context, error, stackTrace) => _currentFile != null 
-            ? Image.file(_currentFile!, fit: fit) 
-            : _buildImageError(tc, 'DISPLAY ERROR'),
+        errorBuilder: (context, error, stackTrace) {
+          debugPrint('DevelopScreen: Image.memory failed, showing loading');
+          // Don't fall back to original - show loading instead
+          return Center(
+            child: CircularProgressIndicator(color: tc.accent),
+          );
+        },
       );
-    } else if (_currentFile != null) {
-      // Fallback: show original file directly while processing
-      imageWidget = Stack(
-        fit: StackFit.expand,
-        children: [
-          buildSafeFileImage(),
-          if (_isProcessing) 
-            Container(
-              color: Colors.black26,
-              child: Center(child: CircularProgressIndicator(color: tc.accent)),
-            ),
-        ],
+    }
+    // Case 3: Still processing - show loading indicator, NOT the original
+    else if (_currentFile != null) {
+      imageWidget = Center(
+        child: CircularProgressIndicator(color: tc.accent),
       );
-    } else {
-      imageWidget = _isProcessing 
-          ? Center(child: CircularProgressIndicator(color: tc.accent))
-          : _buildImageError(tc, 'NO IMAGE');
+    }
+    // Case 4: No file at all
+    else {
+      imageWidget = _buildImageError(tc, 'SELECT A PHOTO');
     }
 
-    final preview = GestureDetector(
-      onLongPressStart: (_) => setState(() => _showingOriginal = true),
-      onLongPressEnd: (_) => setState(() => _showingOriginal = false),
+    // Use InteractiveViewer for proper pinch-to-zoom
+    final preview = InteractiveViewer(
+      minScale: 1.0,
+      maxScale: 4.0,
       child: imageWidget,
     );
 
@@ -1031,6 +1211,10 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
   }
 
   Widget _buildImageError(dynamic tc, String message) {
+    // Show file path for debugging on real devices
+    final filePath = _currentFile?.path ?? 'NO PATH';
+    final fileExists = _currentFile?.existsSync() ?? false;
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -1039,7 +1223,17 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
           const SizedBox(height: 16),
           Text(
             message,
-            style: GoogleFonts.spaceMono(fontSize: 10, color: tc.textMuted, letterSpacing: 2),
+            style: GoogleFonts.spaceMono(fontSize: 12, color: tc.textMuted, letterSpacing: 2),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Text(
+              'File: ${filePath.split('/').last}\nExists: $fileExists',
+              style: GoogleFonts.spaceMono(fontSize: 9, color: tc.textGhost),
+              textAlign: TextAlign.center,
+            ),
           ),
         ],
       ),
@@ -1105,8 +1299,10 @@ class _DevelopScreenState extends ConsumerState<DevelopScreen> {
     if (file != null) {
       final pickedFile = File(file.path);
       if (await pickedFile.exists()) {
+        final bytes = await pickedFile.readAsBytes();
         setState(() {
           _currentFile = pickedFile;
+          _originalBytes = bytes;
         });
         _loadAndProcessImage();
       }

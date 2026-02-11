@@ -56,6 +56,10 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
   late List<CameraModel> _allCameras;
   bool _isScrolling = false;
 
+  // Focus indicator state
+  Offset? _focusPoint;
+  bool _showFocusIndicator = false;
+
   // Preset mode state
   PresetModel? _selectedPreset;
   bool _showGrid = true;
@@ -138,27 +142,37 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
               ),
             ),
 
-          // UI Layers
+          // UI Layers - Responsive to screen height
           SafeArea(
-            child: Column(
-              children: [
-                _buildRoyalHeader(theme, aspectRatio),
-                const Spacer(),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                // Calculate responsive spacing based on screen height
+                final screenHeight = constraints.maxHeight;
+                final isCompactScreen = screenHeight < 600;
+                final bottomPadding = isCompactScreen ? 8.0 : 16.0;
+                final selectorSpacing = isCompactScreen ? 4.0 : 8.0;
 
-                // Bottom UI Group (Fixed position relative to bottom)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Selector (Film Roll or Preset Carousel)
-                      _buildSelector(theme),
-                      const SizedBox(height: 8),
-                      _buildRoyalControls(theme, selectedCamera, aspectRatio),
-                    ],
-                  ),
-                ),
-              ],
+                return Column(
+                  children: [
+                    _buildRoyalHeader(theme, aspectRatio),
+                    const Spacer(),
+
+                    // Bottom UI Group - Responsive padding
+                    Padding(
+                      padding: EdgeInsets.only(bottom: bottomPadding),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Selector (Film Roll or Preset Carousel)
+                          _buildSelector(theme, isCompact: isCompactScreen),
+                          SizedBox(height: selectorSpacing),
+                          _buildRoyalControls(theme, selectedCamera, aspectRatio, isCompact: isCompactScreen),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
           
@@ -271,7 +285,100 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
       );
     }
 
-    return preview;
+    // Wrap with GestureDetector for pinch-to-zoom AND tap-to-focus
+    return GestureDetector(
+      onScaleStart: (_) {
+        _cameraKey.currentState?.onZoomStart();
+      },
+      onScaleUpdate: (details) {
+        if (details.scale != 1.0) {
+          _cameraKey.currentState?.onZoomUpdate(details.scale);
+        }
+      },
+      onTapUp: (details) {
+        _handleTapToFocus(details.localPosition, context);
+      },
+      child: Stack(
+        children: [
+          preview,
+          // Focus indicator
+          if (_showFocusIndicator && _focusPoint != null)
+            Positioned(
+              left: _focusPoint!.dx - 40,
+              top: _focusPoint!.dy - 40,
+              child: _buildFocusIndicator(),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Handle tap to focus
+  void _handleTapToFocus(Offset localPosition, BuildContext context) {
+    // Get the size of the preview area
+    final RenderBox? box = context.findRenderObject() as RenderBox?;
+    if (box == null) return;
+
+    final size = box.size;
+
+    // Calculate normalized coordinates (0.0 to 1.0)
+    final x = localPosition.dx / size.width;
+    final y = localPosition.dy / size.height;
+
+    // Set focus point on camera
+    _cameraKey.currentState?.setFocusPoint(x, y);
+
+    // Show focus indicator
+    setState(() {
+      _focusPoint = localPosition;
+      _showFocusIndicator = true;
+    });
+
+    // Haptic feedback
+    HapticFeedback.lightImpact();
+
+    // Hide indicator after animation
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (mounted) {
+        setState(() {
+          _showFocusIndicator = false;
+        });
+      }
+    });
+  }
+
+  /// Build the focus indicator widget
+  Widget _buildFocusIndicator() {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 1.5, end: 1.0),
+      duration: const Duration(milliseconds: 200),
+      builder: (context, scale, child) {
+        return Transform.scale(
+          scale: scale,
+          child: Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: AppColors.accentGold,
+                width: 2,
+              ),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Center(
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: AppColors.accentGold,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Widget _buildRoyalHeader(ThemeData theme, String aspectRatio) {
@@ -384,16 +491,16 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
   }
 
   /// Switch between camera film roll and preset carousel based on mode
-  Widget _buildSelector(ThemeData theme) {
+  Widget _buildSelector(ThemeData theme, {bool isCompact = false}) {
     if (isPresetMode) {
-      return _buildPresetSelector();
+      return _buildPresetSelector(isCompact: isCompact);
     } else {
-      return _buildHorizontalFilmRoll(theme);
+      return _buildHorizontalFilmRoll(theme, isCompact: isCompact);
     }
   }
 
   /// Build preset selector with mode indicator and carousel
-  Widget _buildPresetSelector() {
+  Widget _buildPresetSelector({bool isCompact = false}) {
     if (_selectedPreset == null) return const SizedBox();
 
     return Column(
@@ -409,9 +516,10 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
     );
   }
 
-  Widget _buildHorizontalFilmRoll(ThemeData theme) {
+  Widget _buildHorizontalFilmRoll(ThemeData theme, {bool isCompact = false}) {
+    final height = isCompact ? 85.0 : 110.0; // Responsive height
     return Container(
-      height: 110, // Sized to fit most screens
+      height: height,
       child: RotatedBox(
         quarterTurns: -1,
         child: ListWheelScrollView.useDelegate(
@@ -505,9 +613,10 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
     );
   }
 
-  Widget _buildRoyalControls(ThemeData theme, CameraModel selectedCamera, String aspectRatio) {
+  Widget _buildRoyalControls(ThemeData theme, CameraModel selectedCamera, String aspectRatio, {bool isCompact = false}) {
+    final height = isCompact ? 80.0 : 100.0; // Responsive height
     return Container(
-      height: 100, // Fixed height for absolute stability
+      height: height,
       child: Stack(
         alignment: Alignment.center,
         children: [
@@ -656,8 +765,10 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
         final image = await state.captureImage();
         if (image != null) {
           if (mounted) {
-            // CRITICAL: Resize image immediately to prevent memory issues on real devices
-            final photoFile = await _resizeImageIfNeeded(File(image.path));
+            // SIMPLIFIED: Pass original file directly to DevelopScreen
+            // DevelopScreen will handle display using native Image.file (no processing needed for display)
+            // Processing for effects happens separately and safely
+            final photoFile = File(image.path);
             
             // When in preset mode, always go to DevelopScreen with the preset applied
             // (presets don't use instant film mode)
@@ -909,17 +1020,33 @@ class GridPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // Main grid lines - more visible
     final paint = Paint()
-      ..color = color
-      ..strokeWidth = 0.5;
+      ..color = Colors.white.withOpacity(0.4)  // Increased visibility
+      ..strokeWidth = 1.0;  // Thicker lines
 
-    // Vertical lines
+    // Vertical lines (rule of thirds)
     canvas.drawLine(Offset(size.width / 3, 0), Offset(size.width / 3, size.height), paint);
     canvas.drawLine(Offset(2 * size.width / 3, 0), Offset(2 * size.width / 3, size.height), paint);
 
-    // Horizontal lines
+    // Horizontal lines (rule of thirds)
     canvas.drawLine(Offset(0, size.height / 3), Offset(size.width, size.height / 3), paint);
     canvas.drawLine(Offset(0, 2 * size.height / 3), Offset(size.width, 2 * size.height / 3), paint);
+
+    // Optional: Add intersection dots for better visibility
+    final dotPaint = Paint()
+      ..color = Colors.white.withOpacity(0.6)
+      ..style = PaintingStyle.fill;
+
+    final dotRadius = 3.0;
+    // Top-left intersection
+    canvas.drawCircle(Offset(size.width / 3, size.height / 3), dotRadius, dotPaint);
+    // Top-right intersection
+    canvas.drawCircle(Offset(2 * size.width / 3, size.height / 3), dotRadius, dotPaint);
+    // Bottom-left intersection
+    canvas.drawCircle(Offset(size.width / 3, 2 * size.height / 3), dotRadius, dotPaint);
+    // Bottom-right intersection
+    canvas.drawCircle(Offset(2 * size.width / 3, 2 * size.height / 3), dotRadius, dotPaint);
   }
 
   @override

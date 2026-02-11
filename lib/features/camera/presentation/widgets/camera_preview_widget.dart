@@ -27,6 +27,15 @@ class _CameraPreviewWidgetState extends State<CameraPreviewWidget>
   bool _isFrontCamera = false;
   List<CameraDescription> _cameras = [];
 
+  // Flash mode - stored to persist across camera switches
+  FlashMode _currentFlashMode = FlashMode.off;
+
+  // Zoom state
+  double _currentZoom = 1.0;
+  double _minZoom = 1.0;
+  double _maxZoom = 1.0;
+  double _baseZoom = 1.0; // For pinch gesture calculation
+
   @override
   void initState() {
     super.initState();
@@ -107,16 +116,37 @@ class _CameraPreviewWidgetState extends State<CameraPreviewWidget>
 
       final selectedCamera = cameraIndex >= 0 ? _cameras[cameraIndex] : _cameras.first;
 
-      // Use medium resolution to prevent memory issues on real devices
-      // High/veryHigh can capture 12-48MP which causes out-of-memory during processing
+      // Use MAXIMUM resolution for best quality - each device gives its best
+      // DevelopScreen handles resizing for processing, so we capture at full quality
       _controller = CameraController(
         selectedCamera,
-        ResolutionPreset.medium, // ~720p - much safer for processing
+        ResolutionPreset.max, // Device's maximum resolution for best quality
         enableAudio: false,
         imageFormatGroup: ImageFormatGroup.jpeg,
       );
 
       await _controller!.initialize();
+
+      // CRITICAL: Apply flash mode IMMEDIATELY after initialization
+      // This fixes the bug where flash auto-turns on after camera switch
+      try {
+        await _controller!.setFlashMode(_currentFlashMode);
+      } catch (e) {
+        debugPrint('Error setting initial flash mode: $e');
+      }
+
+      // Get zoom limits for this camera
+      try {
+        _minZoom = await _controller!.getMinZoomLevel();
+        _maxZoom = await _controller!.getMaxZoomLevel();
+        _currentZoom = _minZoom;
+        _baseZoom = _minZoom;
+      } catch (e) {
+        debugPrint('Error getting zoom limits: $e');
+        _minZoom = 1.0;
+        _maxZoom = 1.0;
+        _currentZoom = 1.0;
+      }
 
       if (mounted) {
         setState(() {
@@ -160,13 +190,80 @@ class _CameraPreviewWidgetState extends State<CameraPreviewWidget>
     }
   }
 
-  /// Update flash mode
+  /// Update flash mode - stores mode for persistence across camera switches
   Future<void> setFlashMode(FlashMode mode) async {
+    _currentFlashMode = mode; // Store for re-initialization
     if (_controller == null || !_controller!.value.isInitialized) return;
     try {
       await _controller!.setFlashMode(mode);
     } catch (e) {
       debugPrint('Error setting flash mode: $e');
+    }
+  }
+
+  /// Get current zoom level
+  double get currentZoom => _currentZoom;
+  double get minZoom => _minZoom;
+  double get maxZoom => _maxZoom;
+
+  /// Set zoom level with clamping
+  Future<void> setZoomLevel(double zoom) async {
+    if (_controller == null || !_controller!.value.isInitialized) return;
+    try {
+      final clampedZoom = zoom.clamp(_minZoom, _maxZoom);
+      await _controller!.setZoomLevel(clampedZoom);
+      _currentZoom = clampedZoom;
+    } catch (e) {
+      debugPrint('Error setting zoom level: $e');
+    }
+  }
+
+  /// Called when pinch gesture starts - stores base zoom
+  void onZoomStart() {
+    _baseZoom = _currentZoom;
+  }
+
+  /// Called during pinch gesture - calculates new zoom from scale
+  Future<void> onZoomUpdate(double scale) async {
+    final newZoom = _baseZoom * scale;
+    await setZoomLevel(newZoom);
+  }
+
+  /// Set focus and exposure point (tap to focus)
+  /// x and y are normalized coordinates (0.0 to 1.0)
+  Future<void> setFocusPoint(double x, double y) async {
+    if (_controller == null || !_controller!.value.isInitialized) return;
+    try {
+      // Set focus point
+      await _controller!.setFocusPoint(Offset(x, y));
+      // Also set exposure point to same location for better results
+      await _controller!.setExposurePoint(Offset(x, y));
+      debugPrint('Focus set to: ($x, $y)');
+    } catch (e) {
+      debugPrint('Error setting focus point: $e');
+      // Some devices don't support focus point - that's okay
+    }
+  }
+
+  /// Lock current focus and exposure
+  Future<void> lockFocus() async {
+    if (_controller == null || !_controller!.value.isInitialized) return;
+    try {
+      await _controller!.setFocusMode(FocusMode.locked);
+      await _controller!.setExposureMode(ExposureMode.locked);
+    } catch (e) {
+      debugPrint('Error locking focus: $e');
+    }
+  }
+
+  /// Unlock focus and exposure (return to auto)
+  Future<void> unlockFocus() async {
+    if (_controller == null || !_controller!.value.isInitialized) return;
+    try {
+      await _controller!.setFocusMode(FocusMode.auto);
+      await _controller!.setExposureMode(ExposureMode.auto);
+    } catch (e) {
+      debugPrint('Error unlocking focus: $e');
     }
   }
 

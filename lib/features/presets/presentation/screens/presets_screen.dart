@@ -31,14 +31,20 @@ class _PresetsScreenState extends State<PresetsScreen> {
   void initState() {
     super.initState();
     _allPresets = PresetRepository.getAllPresets();
-    _filteredPresets = _allPresets;
+    _filteredPresets = List.from(_allPresets);
+    // Sort favorites to the top on initial load
+    _filteredPresets.sort((a, b) {
+      final aFav = PresetRepository.isFavorite(a.id) ? 0 : 1;
+      final bFav = PresetRepository.isFavorite(b.id) ? 0 : 1;
+      return aFav.compareTo(bFav);
+    });
   }
 
   void _filterPresets() {
     setState(() {
       if (_selectedCategory == null) {
         // Handle "ALL" or query-only filter
-        _filteredPresets = _allPresets;
+        _filteredPresets = List.from(_allPresets);
       } else if (_selectedCategory == _likedMarker) {
         _filteredPresets = PresetRepository.getFavoritePresets();
       } else if (_selectedCategory is PresetCategory) {
@@ -46,12 +52,20 @@ class _PresetsScreenState extends State<PresetsScreen> {
       }
 
       // Filter by search query
-
       if (_searchQuery.isNotEmpty) {
         _filteredPresets = _filteredPresets.where((p) =>
           p.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           p.description.toLowerCase().contains(_searchQuery.toLowerCase())
         ).toList();
+      }
+
+      // Sort favorites to the top (except when already filtering by LIKED)
+      if (_selectedCategory != _likedMarker) {
+        _filteredPresets.sort((a, b) {
+          final aFav = PresetRepository.isFavorite(a.id) ? 0 : 1;
+          final bFav = PresetRepository.isFavorite(b.id) ? 0 : 1;
+          return aFav.compareTo(bFav);
+        });
       }
     });
   }

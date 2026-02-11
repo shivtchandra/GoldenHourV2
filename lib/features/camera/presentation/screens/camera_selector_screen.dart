@@ -36,7 +36,13 @@ class _CameraSelectorScreenState extends ConsumerState<CameraSelectorScreen> {
   void initState() {
     super.initState();
     _allCameras = CameraRepository.getAllCameras();
-    _filteredCameras = _allCameras;
+    _filteredCameras = List.from(_allCameras);
+    // Sort favorites to the top on initial load
+    _filteredCameras.sort((a, b) {
+      final aFav = CameraRepository.isFavorite(a.id) ? 0 : 1;
+      final bFav = CameraRepository.isFavorite(b.id) ? 0 : 1;
+      return aFav.compareTo(bFav);
+    });
   }
 
   void _filterCameras(String filter) {
@@ -70,6 +76,15 @@ class _CameraSelectorScreenState extends ConsumerState<CameraSelectorScreen> {
           camera.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           camera.type.toLowerCase().contains(_searchQuery.toLowerCase())
         ).toList();
+      }
+
+      // Sort favorites to the top (except when already filtering by LIKED)
+      if (filter != 'LIKED') {
+        _filteredCameras.sort((a, b) {
+          final aFav = CameraRepository.isFavorite(a.id) ? 0 : 1;
+          final bFav = CameraRepository.isFavorite(b.id) ? 0 : 1;
+          return aFav.compareTo(bFav);
+        });
       }
     });
   }
